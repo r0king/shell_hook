@@ -62,7 +62,7 @@ pub struct RunArgs {
     pub quiet: bool,
 
     /// The command to execute and stream its output.
-    #[arg(required = true, last = true, value_name = "COMMAND")]
+    #[arg(required = true, value_name = "COMMAND")]
     pub command: Vec<String>,
 }
 

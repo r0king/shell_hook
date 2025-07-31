@@ -1,8 +1,9 @@
 use shell_hook::app;
+use shell_hook::error::AppError;
 
 #[tokio::main]
 async fn main() {
-    let result = app::run().await;
+    let result = run_app().await;
 
     match result {
         Ok(code) => std::process::exit(code),
@@ -11,4 +12,8 @@ async fn main() {
             std::process::exit(1);
         }
     }
+}
+
+async fn run_app() -> Result<i32, AppError> {
+    app::run().await
 }

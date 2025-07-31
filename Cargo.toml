@@ -35,3 +35,7 @@ path = "src/main.rs"
 [[test]]
 name = "app_tests"
 path = "tests/app_tests.rs"
+
+[[test]]
+name = "main_tests"
+path = "tests/main_tests.rs"

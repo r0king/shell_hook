@@ -24,7 +24,12 @@ pub struct AppContext {
 
 /// The main application logic.
 pub async fn run() -> Result<i32, AppError> {
-    let cli = Cli::parse();
+    let cli = Cli::try_parse()?;
+    run_app(cli).await
+}
+
+pub async fn run_from(args: Vec<&str>) -> Result<i32, AppError> {
+    let cli = Cli::try_parse_from(args)?;
     run_app(cli).await
 }
 

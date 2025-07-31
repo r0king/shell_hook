@@ -101,3 +101,13 @@ fn test_webhook_url_from_env() {
 
     env::remove_var("WEBHOOK_URL");
 }
+
+#[test]
+fn test_webhook_format_enum() {
+    let _lock = ENV_LOCK.lock().unwrap();
+    let cli_google = Cli::parse_from(vec!["shell_hook", "--format", "google-chat", "run", "--", "echo", "hello"]);
+    assert!(matches!(cli_google.format, WebhookFormat::GoogleChat));
+
+    let cli_slack = Cli::parse_from(vec!["shell_hook", "--format", "slack", "run", "--", "echo", "hello"]);
+    assert!(matches!(cli_slack.format, WebhookFormat::Slack));
+}

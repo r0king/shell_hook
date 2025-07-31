@@ -20,4 +20,7 @@ pub enum AppError {
 
     #[error("Readline error: {0}")]
     ReadlineError(#[from] ReadlineError),
+
+    #[error("Command-line parsing error: {0}")]
+    CliError(#[from] clap::Error),
 }
