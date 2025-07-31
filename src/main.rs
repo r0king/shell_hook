@@ -238,31 +238,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     send_message(&context, &start_message).await;
 
     // --- Run command and stream output ---
-    let status = run_command_and_stream(context.clone(), tx).await?;
+    let status_result = run_command_and_stream(context.clone(), tx).await;
 
     // --- Wait for sender to finish sending buffered messages ---
     sender_task.await?;
 
     // --- Send final status message ---
-    let (base_message, is_error) = match status.code() {
-        Some(0) => (
-            context
-                .args
-                .on_success
-                .clone()
-                .unwrap_or_else(|| "✅ Command finished successfully.".to_string()),
-            false,
-        ),
-        Some(code) => (
-            context
-                .args
-                .on_failure
-                .clone()
-                .unwrap_or_else(|| format!("❌ Command failed with exit code {}.", code)),
-            true,
-        ),
-        None => ("❌ Command was terminated by a signal.".to_string(), true),
-    };
+    let exit_code;
+    let (base_message, is_error) =
+        match status_result {
+            Ok(status) => {
+                exit_code = status.code();
+                match exit_code {
+                    Some(0) => (
+                        context
+                            .args
+                            .on_success
+                            .clone()
+                            .unwrap_or_else(|| "✅ Command finished successfully.".to_string()),
+                        false,
+                    ),
+                    Some(code) => (
+                        context.args.on_failure.clone().unwrap_or_else(|| {
+                            format!("❌ Command failed with exit code {}.", code)
+                        }),
+                        true,
+                    ),
+                    None => ("❌ Command was terminated by a signal.".to_string(), true),
+                }
+            }
+            Err(e) => {
+                eprintln!("[hook-stream] Error: {}", e);
+                exit_code = Some(127); // Common exit code for command not found
+                (
+                    context
+                        .args
+                        .on_failure
+                        .clone()
+                        .unwrap_or_else(|| "🔥 CRITICAL: Command failed to start.".to_string()),
+                    true,
+                )
+            }
+        };
 
     let final_message = format!("{}{}", context.title_prefix, base_message);
     if is_error {
@@ -272,9 +289,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     send_message(&context, &final_message).await;
 
-    if let Some(code) = status.code() {
+    if let Some(code) = exit_code {
         std::process::exit(code);
+    } else {
+        std::process::exit(1); // For termination by signal
     }
-
-    Ok(())
 }
