@@ -1,16 +1,37 @@
-# shell_hook
+# ShellHook: Stream Command Output to Webhooks
 
-A powerful CLI tool to stream command output to webhooks with buffering, custom messages, and multi-platform support.
+[![CI](https://github.com/r0king/shell_hook/actions/workflows/ci.yml/badge.svg)](https://github.com/r0king/shell_hook/actions/workflows/ci.yml)
 
-## Features
+**ShellHook** is a powerful and flexible CLI tool that bridges the gap between your command-line scripts and modern notification platforms. It captures the `stdout` and `stderr` of any command, buffers the output, and streams it to a webhook in real-time.
 
-- **Real-time Output Streaming**: Stream `stdout` and `stderr` of any command to a webhook.
-- **Buffering**: Lines are buffered and sent in batches to avoid rate-limiting.
-- **Customizable Messages**: Set custom messages for command success or failure.
-- **Webhook Formats**: Supports different webhook payload formats like Google Chat and Slack.
-- **Quiet Mode**: Option to suppress command output and only send start/finish messages.
-- **Dry Run**: Test your command without executing or sending webhooks.
-- **Environment Variable Support**: Configure the webhook URL via the `WEBHOOK_URL` environment variable.
+It's perfect for monitoring long-running processes, getting build notifications, or receiving alerts from cron jobs.
+
+## Key Features
+
+- **Real-time Output Streaming**: Get instant feedback from your scripts by streaming `stdout` and `stderr` directly to your preferred webhook.
+  
+  ![Demo](https://github.com/r0king/shell_hook/assets/18419334/531d0411-92ba-4475-b072-a08b5f259695)
+
+- **Smart Buffering**: Avoid rate-limiting issues with intelligent line buffering. Output is sent in batches based on size or time, ensuring you never miss a line.
+
+- **Customizable Messages**: Tailor notifications for command success or failure. Provide context and clarity with custom titles and messages.
+
+- **Webhook Agnostic**: Supports popular webhook formats like Google Chat and Slack out of the box.
+
+- **Quiet Mode**: Suppress noisy command output and receive only essential start and finish notifications.
+
+- **Dry Run Mode**: Test your configuration without executing commands or sending webhooks.
+
+- **Environment Variable Support**: Easily configure the webhook URL via the `WEBHOOK_URL` environment variable for seamless integration with CI/CD pipelines.
+
+## Why ShellHook?
+
+In a world of automated workflows and CI/CD pipelines, getting timely notifications is crucial. ShellHook was built to solve a common problem: how do you easily monitor the output of a command-line script from a remote system?
+
+With ShellHook, you can:
+- **Monitor cron jobs**: Get alerts if your nightly backups fail.
+- **Track deployments**: See the progress of your deployment script in real-time.
+- **Stream build logs**: Keep an eye on your CI/CD pipeline from your favorite chat client.
 
 ## Installation
 
@@ -26,6 +47,19 @@ A powerful CLI tool to stream command output to webhooks with buffering, custom 
     cargo install --path .
     ```
 
+## Quick Start
+
+1.  **Set the webhook URL**:
+    ```sh
+    export WEBHOOK_URL="https://your-webhook-url"
+    ```
+2.  **Run a command**:
+    ```sh
+    shell_hook --title "My First Job" --on-success "It worked! ✅" -- ls -la
+    ```
+
+This will run `ls -la`, stream its output to your webhook, and send a "It worked! ✅" message upon completion.
+
 ## Usage
 
 ```sh
@@ -34,74 +68,25 @@ shell_hook [OPTIONS] -- <COMMAND>...
 
 ## Options
 
-| Option                | Environment Variable | Description                                                                                             |
-| --------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- |
-| `--webhook-url <URL>` | `WEBHOOK_URL`        | The webhook URL to send messages to.                                                                    |
-| `--on-success <MSG>`  |                      | Custom message to send on command success.                                                              |
-| `--on-failure <MSG>`  |                      | Custom message to send on command failure.                                                              |
-| `-q`, `--quiet`       |                      | Suppress streaming of stdout/stderr to the webhook (start/finish messages are still sent).              |
-| `-t`, `--title <TITLE>` |                      | A title to prepend to all messages, e.g., "[My Project]".                                               |
-| `--dry-run`           |                      | Don't execute the command or send webhooks; just print what would be done.                              |
-| `--format <FORMAT>`   |                      | The format of the webhook payload. (Options: `google-chat`, `slack`) (Default: `google-chat`) |
-| `<COMMAND>...`        |                      | The command to execute and stream its output.                                                           |
+| Option | Environment Variable | Description |
+|---|---|---|
+| `--webhook-url <URL>` | `WEBHOOK_URL` | The webhook URL to send messages to. |
+| `--on-success <MSG>` | | Custom message to send on command success. |
+| `--on-failure <MSG>` | | Custom message to send on command failure. |
+| `-q`, `--quiet` | | Suppress streaming of stdout/stderr to the webhook. |
+| `-t`, `--title <TITLE>` | | A title to prepend to all messages (e.g., "[My Project]"). |
+| `--dry-run` | | Don't execute the command or send webhooks. |
+| `--format <FORMAT>` | | Webhook payload format. (Options: `google-chat`, `slack`) |
+| `<COMMAND>...` | | The command to execute and stream. |
 
 ## Webhook Formats
-
-You can specify the webhook format using the `--format` option.
 
 -   `google-chat`: Formats the payload for Google Chat webhooks. (Default)
 -   `slack`: Formats the payload for Slack webhooks.
 
-## Examples
+## Contributing
 
-### Basic Usage
-
-Stream the output of a simple `echo` command.
-
-```sh
-export WEBHOOK_URL="https://your-webhook-url"
-shell_hook -- ls -la
-```
-
-### With a Title
-
-Add a title to all messages sent to the webhook.
-
-```sh
-shell_hook --title "My Awesome Project" -- ls -la
-```
-
-### Custom Success and Failure Messages
-
-Send custom messages depending on the command's exit code.
-
-```sh
-shell_hook --on-success "Deployment complete! 🎉" --on-failure "Deployment failed. 😢" -- ./deploy.sh
-```
-
-### Using a Different Webhook Format
-
-Send output to a Slack webhook.
-
-```sh
-shell_hook --format slack --webhook-url "https://hooks.slack.com/services/..." -- echo "Hello from shell_hook!"
-```
-
-### Quiet Mode
-
-Run a command but only get notified when it starts and finishes, not with the full output.
-
-```sh
-shell_hook --quiet -- ./long-running-script.sh
-```
-
-### Dry Run
-
-See what the tool would do without actually running the command or sending a webhook.
-
-```sh
-shell_hook --dry-run --on-success "This will not be sent" -- echo "This will not run"
-```
+Contributions are welcome! If you have a feature request, bug report, or pull request, please feel free to open an issue or submit a PR.
 
 ## License
 

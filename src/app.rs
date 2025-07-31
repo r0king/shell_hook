@@ -6,6 +6,7 @@ use crate::webhook::{run_webhook_sender, send_message};
 use clap::Parser;
 use reqwest::Client;
 use std::io::ErrorKind;
+use std::process::ExitStatus;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -15,6 +16,7 @@ pub struct AppContext {
     pub client: Client,
 }
 
+/// The main application logic.
 pub async fn run() -> Result<i32, AppError> {
     let args = Arc::new(Args::parse());
 
@@ -23,14 +25,6 @@ pub async fn run() -> Result<i32, AppError> {
         return Err(AppError::MissingWebhookUrl);
     }
 
-    let command_str = args.command.join(" ");
-    let title_prefix = if !args.title.is_empty() {
-        format!("[{}] ", args.title)
-    } else {
-        "".to_string()
-    };
-
-    // Create shared context
     let context = Arc::new(AppContext {
         args: args.clone(),
         client: Client::new(),
@@ -41,6 +35,12 @@ pub async fn run() -> Result<i32, AppError> {
     let sender_task = tokio::spawn(run_webhook_sender(context.clone(), rx));
 
     // --- Send initial message ---
+    let command_str = args.command.join(" ");
+    let title_prefix = if !args.title.is_empty() {
+        format!("[{}] ", args.title)
+    } else {
+        "".to_string()
+    };
     let start_message = format!("{}🚀 Starting command: `{}`", title_prefix, command_str);
     println!("{}", start_message);
     send_message(&context, &start_message).await;
@@ -51,7 +51,16 @@ pub async fn run() -> Result<i32, AppError> {
     // --- Wait for sender to finish sending buffered messages ---
     sender_task.await?;
 
-    // --- Send final status message ---
+    // --- Handle command result and send final message ---
+    handle_command_result(&context, status_result, &title_prefix).await
+}
+
+/// Handles the result of the command execution, sends a final message, and returns the exit code.
+async fn handle_command_result(
+    context: &Arc<AppContext>,
+    status_result: std::io::Result<ExitStatus>,
+    title_prefix: &str,
+) -> Result<i32, AppError> {
     match status_result {
         Ok(status) => {
             let exit_code = status.code().unwrap_or(1);
@@ -80,7 +89,7 @@ pub async fn run() -> Result<i32, AppError> {
             } else {
                 println!("{}", final_message);
             }
-            send_message(&context, &final_message).await;
+            send_message(context, &final_message).await;
             Ok(exit_code)
         }
         Err(e) => {
@@ -91,7 +100,7 @@ pub async fn run() -> Result<i32, AppError> {
                 .unwrap_or_else(|| format!("❌ Command failed to start: {}.", e));
             let final_message = format!("{}{}", title_prefix, base_message);
             eprintln!("{}", final_message);
-            send_message(&context, &final_message).await;
+            send_message(context, &final_message).await;
             // Decide on an exit code for command start failure
             match e.kind() {
                 ErrorKind::NotFound => Ok(127),

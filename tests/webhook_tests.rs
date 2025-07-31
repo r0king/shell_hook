@@ -1,12 +1,12 @@
 use clap::Parser;
-use shell_hook::app::AppContext;
-use shell_hook::cli::{Args, WebhookFormat};
-use shell_hook::message::StreamMessage;
-use shell_hook::webhook::{create_payload, run_webhook_sender, send_buffered_lines, send_payload};
 use httpmock::prelude::*;
 use httpmock::MockServer;
 use reqwest::Client;
 use serde_json::json;
+use shell_hook::app::AppContext;
+use shell_hook::cli::{Args, WebhookFormat};
+use shell_hook::message::StreamMessage;
+use shell_hook::webhook::{create_payload, run_webhook_sender, send_buffered_lines, send_payload};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -49,7 +49,7 @@ async fn test_send_payload_dry_run() {
     let payload = json!({"text": "test"});
 
     // This should not send a request
-    send_payload(&client, &server.url("/"), &payload, true).await;
+    send_payload(&client, Some(&server.url("/")), &payload, true).await;
 
     // Assert that the mock was not called
     mock.assert_hits(0);

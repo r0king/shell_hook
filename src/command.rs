@@ -27,10 +27,8 @@ pub async fn run_command_and_stream(
         let mut reader = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = reader.next_line().await {
             println!("{}", line);
-            if !quiet_mode {
-                if tx_out.send(StreamMessage::Line(line)).await.is_err() {
-                    break; // Receiver has been dropped
-                }
+            if !quiet_mode && tx_out.send(StreamMessage::Line(line)).await.is_err() {
+                break; // Receiver has been dropped
             }
         }
     });
@@ -40,10 +38,8 @@ pub async fn run_command_and_stream(
         let mut reader = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
             eprintln!("{}", line);
-            if !quiet_mode {
-                if tx_err.send(StreamMessage::Line(line)).await.is_err() {
-                    break; // Receiver has been dropped
-                }
+            if !quiet_mode && tx_err.send(StreamMessage::Line(line)).await.is_err() {
+                break; // Receiver has been dropped
             }
         }
     });

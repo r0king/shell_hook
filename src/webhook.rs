@@ -16,29 +16,40 @@ pub fn create_payload(message: &str, format: &WebhookFormat) -> Value {
 }
 
 /// Sends a pre-formatted payload to a webhook URL.
-pub async fn send_payload(client: &Client, webhook_url: &str, payload: &Value, is_dry_run: bool) {
+pub async fn send_payload(
+    client: &Client,
+    webhook_url: Option<&str>,
+    payload: &Value,
+    is_dry_run: bool,
+) {
     if is_dry_run {
         println!("[DRY RUN] Would send to webhook: {}", payload);
         return;
     }
-    if let Err(e) = client.post(webhook_url).json(payload).send().await {
-        eprintln!("[shell_hook] Error sending to webhook: {}", e);
+    if let Some(url) = webhook_url {
+        if let Err(e) = client.post(url).json(payload).send().await {
+            eprintln!("[shell_hook] Error sending to webhook: {}", e);
+        }
     }
 }
 
 /// A convenience helper to create and send a simple text message.
 pub async fn send_message(context: &Arc<AppContext>, message: &str) {
-    if let Some(url) = context.args.webhook_url.as_deref() {
-        let payload = create_payload(message, &context.args.format);
-        send_payload(&context.client, url, &payload, context.args.dry_run).await;
-    }
+    let payload = create_payload(message, &context.args.format);
+    send_payload(
+        &context.client,
+        context.args.webhook_url.as_deref(),
+        &payload,
+        context.args.dry_run,
+    )
+    .await;
 }
 
 /// The core task that receives lines from a channel and sends them to the webhook in batches.
 pub async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver<StreamMessage>) {
     if context.args.webhook_url.is_none() && !context.args.dry_run {
         // Still need to drain the receiver if no webhook is set, to prevent the sender from blocking.
-        while let Some(_) = rx.recv().await {}
+        while (rx.recv().await).is_some() {}
         return;
     }
 

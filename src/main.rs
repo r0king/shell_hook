@@ -8,8 +8,5 @@ async fn main() {
         eprintln!("[shell_hook] Error: {}", e);
     }
 
-    std::process::exit(match result {
-        Ok(code) => code,
-        Err(_) => 1,
-    });
+    std::process::exit(result.unwrap_or(1));
 }

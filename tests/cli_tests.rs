@@ -1,5 +1,6 @@
 use clap::Parser;
 use shell_hook::cli::{Args, WebhookFormat};
+use std::env;
 
 #[test]
 fn test_cli_args_parsing() {
@@ -40,7 +41,16 @@ fn test_cli_args_parsing() {
 
 #[test]
 fn test_cli_args_defaults() {
+    // Temporarily clear the environment variable to test defaults
+    let original_webhook_url = env::var("WEBHOOK_URL").ok();
+    env::remove_var("WEBHOOK_URL");
+
     let args = Args::parse_from(vec!["shell_hook", "--", "echo", "hello"]);
+
+    // Restore the environment variable after parsing
+    if let Some(url) = original_webhook_url {
+        env::set_var("WEBHOOK_URL", url);
+    }
 
     assert_eq!(args.webhook_url, None);
     assert_eq!(args.on_success, None);
