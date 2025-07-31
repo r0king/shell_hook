@@ -2,11 +2,27 @@ use clap::{Parser, ValueEnum};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::process::{ExitStatus, Stdio};
+use std::io::ErrorKind;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc;
+
+#[derive(Debug, thiserror::Error)]
+pub enum AppError {
+    #[error("Missing Webhook URL: Set --webhook-url or the WEBHOOK_URL environment variable.")]
+    MissingWebhookUrl,
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    #[error(transparent)]
+    Mpsc(#[from] tokio::sync::mpsc::error::SendError<StreamMessage>),
+
+    #[error(transparent)]
+    TaskJoin(#[from] tokio::task::JoinError),
+}
 
 /// A powerful CLI tool to stream command output to webhooks with buffering,
 /// custom messages, and multi-platform support.
@@ -59,7 +75,8 @@ enum WebhookFormat {
 }
 
 /// An enum to pass messages from the command runners to the webhook sender.
-enum StreamMessage {
+#[derive(Clone)]
+pub enum StreamMessage {
     Line(String),
     CommandFinished,
 }
@@ -68,7 +85,7 @@ enum StreamMessage {
 struct AppContext {
     args: Args,
     client: Client,
-    webhook_url: String,
+    webhook_url: Option<String>,
     title_prefix: String,
 }
 
@@ -93,18 +110,20 @@ async fn send_payload(client: &Client, webhook_url: &str, payload: &Value, is_dr
 
 /// A convenience helper to create and send a simple text message.
 async fn send_message(context: &Arc<AppContext>, message: &str) {
-    let payload = create_payload(message, &context.args.format);
-    send_payload(
-        &context.client,
-        &context.webhook_url,
-        &payload,
-        context.args.dry_run,
-    )
-    .await;
+    if let Some(url) = &context.webhook_url {
+        let payload = create_payload(message, &context.args.format);
+        send_payload(&context.client, url, &payload, context.args.dry_run).await;
+    }
 }
 
 /// The core task that receives lines from a channel and sends them to the webhook in batches.
 async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver<StreamMessage>) {
+    if context.webhook_url.is_none() && !context.args.dry_run {
+        // Still need to drain the receiver if no webhook is set, to prevent the sender from blocking.
+        while let Some(_) = rx.recv().await {}
+        return;
+    }
+
     let mut buffer = Vec::new();
     let buffer_timeout = Duration::from_secs(2);
     let buffer_max_size = 10;
@@ -195,20 +214,13 @@ async fn run_command_and_stream(
     Ok(status)
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn run() -> Result<i32, AppError> {
     let args = Args::parse();
 
     // Validate arguments
-    let webhook_url = match &args.webhook_url {
-        Some(url) => url.clone(),
-        None if !args.dry_run => {
-            eprintln!("[hook-stream] Critical Error: --webhook-url or WEBHOOK_URL environment variable must be set.");
-            eprintln!("\nFor more information, try '--help'.");
-            std::process::exit(2);
-        }
-        _ => "dry-run-placeholder".to_string(), // Placeholder for dry-run
-    };
+    if args.webhook_url.is_none() && !args.dry_run {
+        return Err(AppError::MissingWebhookUrl);
+    }
 
     let command_str = args.command.join(" ");
     let title_prefix = if !args.title.is_empty() {
@@ -219,9 +231,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create shared context
     let context = Arc::new(AppContext {
+        webhook_url: args.webhook_url.clone(),
         args,
         client: Client::new(),
-        webhook_url,
         title_prefix,
     });
 
@@ -244,54 +256,64 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sender_task.await?;
 
     // --- Send final status message ---
-    let exit_code;
-    let (base_message, is_error) =
-        match status_result {
-            Ok(status) => {
-                exit_code = status.code();
-                match exit_code {
-                    Some(0) => (
-                        context
-                            .args
-                            .on_success
-                            .clone()
-                            .unwrap_or_else(|| "✅ Command finished successfully.".to_string()),
-                        false,
-                    ),
-                    Some(code) => (
-                        context.args.on_failure.clone().unwrap_or_else(|| {
-                            format!("❌ Command failed with exit code {}.", code)
-                        }),
-                        true,
-                    ),
-                    None => ("❌ Command was terminated by a signal.".to_string(), true),
-                }
-            }
-            Err(e) => {
-                eprintln!("[hook-stream] Error: {}", e);
-                exit_code = Some(127); // Common exit code for command not found
-                (
+    match status_result {
+        Ok(status) => {
+            let exit_code = status.code().unwrap_or(1);
+            let (base_message, is_error) = match status.code() {
+                Some(0) => (
+                    context
+                        .args
+                        .on_success
+                        .clone()
+                        .unwrap_or_else(|| "✅ Command finished successfully.".to_string()),
+                    false,
+                ),
+                Some(code) => (
                     context
                         .args
                         .on_failure
                         .clone()
-                        .unwrap_or_else(|| "🔥 CRITICAL: Command failed to start.".to_string()),
+                        .unwrap_or_else(|| format!("❌ Command failed with exit code {}.", code)),
                     true,
-                )
+                ),
+                None => ("❌ Command was terminated by a signal.".to_string(), true),
+            };
+
+            let final_message = format!("{}{}", context.title_prefix, base_message);
+            if is_error {
+                eprintln!("{}", final_message);
+            } else {
+                println!("{}", final_message);
             }
-        };
-
-    let final_message = format!("{}{}", context.title_prefix, base_message);
-    if is_error {
-        eprintln!("{}", final_message);
-    } else {
-        println!("{}", final_message);
+            send_message(&context, &final_message).await;
+            Ok(exit_code)
+        }
+        Err(e) => {
+            let base_message = context.args.on_failure.clone().unwrap_or_else(|| {
+                format!("❌ Command failed to start: {}.", e)
+            });
+            let final_message = format!("{}{}", context.title_prefix, base_message);
+            eprintln!("{}", final_message);
+            send_message(&context, &final_message).await;
+            // Decide on an exit code for command start failure
+            match e.kind() {
+                ErrorKind::NotFound => Ok(127),
+                _ => Ok(1),
+            }
+        }
     }
-    send_message(&context, &final_message).await;
+}
 
-    if let Some(code) = exit_code {
-        std::process::exit(code);
-    } else {
-        std::process::exit(1); // For termination by signal
+#[tokio::main]
+async fn main() {
+    let result = run().await;
+
+    if let Err(e) = &result {
+        eprintln!("[hook-stream] Error: {}", e);
     }
+
+    std::process::exit(match result {
+        Ok(code) => code,
+        Err(_) => 1,
+    });
 }
