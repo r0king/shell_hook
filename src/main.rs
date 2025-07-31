@@ -4,9 +4,11 @@ use shell_hook::app;
 async fn main() {
     let result = app::run().await;
 
-    if let Err(e) = &result {
-        eprintln!("[shell_hook] Error: {}", e);
+    match result {
+        Ok(code) => std::process::exit(code),
+        Err(e) => {
+            eprintln!("[shell_hook] Error: {}", e);
+            std::process::exit(1);
+        }
     }
-
-    std::process::exit(result.unwrap_or(1));
 }

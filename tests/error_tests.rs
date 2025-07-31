@@ -26,5 +26,5 @@ async fn test_mpsc_error() {
     drop(rx);
     let send_error = tx.send(StreamMessage::CommandFinished).await.unwrap_err();
     let app_error = AppError::from(send_error);
-    assert_eq!(app_error.to_string(), "channel closed");
+    assert_eq!(app_error.to_string(), "Failed to send message to the channel");
 }

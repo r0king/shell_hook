@@ -1,4 +1,3 @@
-use clap::Parser;
 use httpmock::prelude::*;
 use httpmock::MockServer;
 use reqwest::Client;
@@ -13,9 +12,12 @@ use tokio::sync::mpsc;
 
 /// Creates a default AppContext for testing.
 fn mock_context(server: &MockServer, dry_run: bool) -> Arc<AppContext> {
-    let mut args = Args::parse_from(vec!["shell_hook", "--", "echo", "test"]);
-    args.webhook_url = Some(server.url("/"));
-    args.dry_run = dry_run;
+    let args = Args {
+        webhook_url: Some(server.url("/")),
+        dry_run,
+        command: vec!["echo".to_string(), "test".to_string()],
+        ..Default::default()
+    };
 
     Arc::new(AppContext {
         args: Arc::new(args),

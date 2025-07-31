@@ -8,8 +8,8 @@ pub enum AppError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    #[error(transparent)]
-    Mpsc(#[from] tokio::sync::mpsc::error::SendError<StreamMessage>),
+    #[error("Failed to send message to the channel")]
+    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<StreamMessage>),
 
     #[error(transparent)]
     TaskJoin(#[from] tokio::task::JoinError),

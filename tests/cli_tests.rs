@@ -31,7 +31,7 @@ fn test_cli_args_parsing() {
     assert_eq!(args.on_success, Some("Success!".to_string()));
     assert_eq!(args.on_failure, Some("Failure!".to_string()));
     assert!(args.quiet);
-    assert_eq!(args.title, "My Test");
+    assert_eq!(args.title, Some("My Test".to_string()));
     assert!(args.dry_run);
     assert!(matches!(args.format, WebhookFormat::Slack));
     assert_eq!(args.command, vec!["ls", "-la"]);
@@ -56,7 +56,7 @@ fn test_cli_args_defaults() {
     assert_eq!(args.on_success, None);
     assert_eq!(args.on_failure, None);
     assert!(!args.quiet);
-    assert_eq!(args.title, "");
+    assert_eq!(args.title, None);
     assert!(!args.dry_run);
     assert!(matches!(args.format, WebhookFormat::GoogleChat));
     assert_eq!(args.command, vec!["echo", "hello"]);

@@ -17,32 +17,18 @@ pub async fn run_command_and_stream(
         .stderr(Stdio::piped())
         .spawn()?;
 
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
-
-    // Spawn tasks to read stdout and stderr concurrently
-    let tx_out = tx.clone();
-    let quiet_mode = context.args.quiet;
-    let stdout_task = tokio::spawn(async move {
-        let mut reader = BufReader::new(stdout).lines();
-        while let Ok(Some(line)) = reader.next_line().await {
-            println!("{}", line);
-            if !quiet_mode && tx_out.send(StreamMessage::Line(line)).await.is_err() {
-                break; // Receiver has been dropped
-            }
-        }
-    });
-
-    let tx_err = tx.clone();
-    let stderr_task = tokio::spawn(async move {
-        let mut reader = BufReader::new(stderr).lines();
-        while let Ok(Some(line)) = reader.next_line().await {
-            eprintln!("{}", line);
-            if !quiet_mode && tx_err.send(StreamMessage::Line(line)).await.is_err() {
-                break; // Receiver has been dropped
-            }
-        }
-    });
+    let stdout_task = stream_output(
+        child.stdout.take().unwrap(),
+        tx.clone(),
+        context.args.quiet,
+        false,
+    );
+    let stderr_task = stream_output(
+        child.stderr.take().unwrap(),
+        tx.clone(),
+        context.args.quiet,
+        true,
+    );
 
     // Wait for the command to complete and for readers to finish
     let status = child.wait().await?;
@@ -53,4 +39,26 @@ pub async fn run_command_and_stream(
     let _ = tx.send(StreamMessage::CommandFinished).await;
 
     Ok(status)
+}
+
+/// Helper to stream output from a reader to a channel, printing lines to stdout/stderr.
+fn stream_output<R: tokio::io::AsyncRead + Unpin + Send + 'static>(
+    reader: R,
+    tx: mpsc::Sender<StreamMessage>,
+    quiet_mode: bool,
+    is_stderr: bool,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(reader).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            if is_stderr {
+                eprintln!("{}", line);
+            } else {
+                println!("{}", line);
+            }
+            if !quiet_mode && tx.send(StreamMessage::Line(line)).await.is_err() {
+                break; // Receiver has been dropped
+            }
+        }
+    })
 }

@@ -85,12 +85,11 @@ pub async fn send_buffered_lines(context: &Arc<AppContext>, buffer: &mut Vec<Str
         return;
     }
     let combined_message = buffer.join("\n");
-    let title_prefix = if !context.args.title.is_empty() {
-        format!("[{}] ", context.args.title)
+    let full_message = if let Some(title) = &context.args.title {
+        format!("[{}] {}", title, combined_message)
     } else {
-        "".to_string()
+        combined_message
     };
-    let full_message = format!("{}{}", title_prefix, combined_message);
     send_message(context, &full_message).await;
     buffer.clear();
 }

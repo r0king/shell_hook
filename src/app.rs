@@ -36,12 +36,8 @@ pub async fn run() -> Result<i32, AppError> {
 
     // --- Send initial message ---
     let command_str = args.command.join(" ");
-    let title_prefix = if !args.title.is_empty() {
-        format!("[{}] ", args.title)
-    } else {
-        "".to_string()
-    };
-    let start_message = format!("{}🚀 Starting command: `{}`", title_prefix, command_str);
+    let start_message =
+        format_with_title(&args, &format!("🚀 Starting command: `{}`", command_str));
     println!("{}", start_message);
     send_message(&context, &start_message).await;
 
@@ -52,14 +48,13 @@ pub async fn run() -> Result<i32, AppError> {
     sender_task.await?;
 
     // --- Handle command result and send final message ---
-    handle_command_result(&context, status_result, &title_prefix).await
+    handle_command_result(&context, status_result).await
 }
 
 /// Handles the result of the command execution, sends a final message, and returns the exit code.
 async fn handle_command_result(
     context: &Arc<AppContext>,
     status_result: std::io::Result<ExitStatus>,
-    title_prefix: &str,
 ) -> Result<i32, AppError> {
     match status_result {
         Ok(status) => {
@@ -83,7 +78,7 @@ async fn handle_command_result(
                     None => ("❌ Command was terminated by a signal.".to_string(), true),
                 };
 
-            let final_message = format!("{}{}", title_prefix, base_message);
+            let final_message = format_with_title(&context.args, &base_message);
             if is_error {
                 eprintln!("{}", final_message);
             } else {
@@ -98,7 +93,7 @@ async fn handle_command_result(
                 .on_failure
                 .clone()
                 .unwrap_or_else(|| format!("❌ Command failed to start: {}.", e));
-            let final_message = format!("{}{}", title_prefix, base_message);
+            let final_message = format_with_title(&context.args, &base_message);
             eprintln!("{}", final_message);
             send_message(context, &final_message).await;
             // Decide on an exit code for command start failure
@@ -107,5 +102,14 @@ async fn handle_command_result(
                 _ => Ok(1),
             }
         }
+    }
+}
+
+/// Formats a message with the title prefix if a title is provided.
+fn format_with_title(args: &Args, message: &str) -> String {
+    if let Some(title) = &args.title {
+        format!("[{}] {}", title, message)
+    } else {
+        message.to_string()
     }
 }

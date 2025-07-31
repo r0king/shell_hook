@@ -27,8 +27,8 @@ pub struct Args {
     pub quiet: bool,
 
     /// A title to prepend to all messages, e.g., "[My Project]".
-    #[arg(short, long, default_value = "", value_name = "TITLE")]
-    pub title: String,
+    #[arg(short, long, value_name = "TITLE")]
+    pub title: Option<String>,
 
     /// Don't execute the command or send webhooks; just print what would be done.
     #[arg(long)]
@@ -56,4 +56,21 @@ pub enum WebhookFormat {
     #[default]
     GoogleChat,
     Slack,
+}
+
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            webhook_url: None,
+            on_success: None,
+            on_failure: None,
+            quiet: false,
+            title: None,
+            dry_run: false,
+            format: WebhookFormat::default(),
+            buffer_size: 10,
+            buffer_timeout: 2.0,
+            command: Vec::new(),
+        }
+    }
 }
