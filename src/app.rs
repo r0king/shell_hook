@@ -24,8 +24,12 @@ pub struct AppContext {
 
 /// The main application logic.
 pub async fn run() -> Result<i32, AppError> {
-    let cli = Arc::new(Cli::parse());
+    let cli = Cli::parse();
+    run_app(cli).await
+}
 
+pub async fn run_app(cli: Cli) -> Result<i32, AppError> {
+    let cli = Arc::new(cli);
     // Validate arguments
     if cli.webhook_url.is_none() && !cli.dry_run {
         return Err(AppError::MissingWebhookUrl);
@@ -42,7 +46,7 @@ pub async fn run() -> Result<i32, AppError> {
     }
 }
 
-async fn run_single_command(
+pub async fn run_single_command(
     context: &Arc<AppContext>,
     run_args: &RunArgs,
 ) -> Result<i32, AppError> {
@@ -65,13 +69,13 @@ async fn run_single_command(
     let status_result = run_command_and_stream(context.clone(), tx, run_args).await;
 
     // --- Wait for sender to finish sending buffered messages ---
-    sender_task.await?;
+    let _ = sender_task.await?;
 
     // --- Handle command result and send final message ---
     handle_command_result(context, status_result, run_args).await
 }
 
-async fn run_shell_session(context: &Arc<AppContext>) -> Result<i32, AppError> {
+pub async fn run_shell_session(context: &Arc<AppContext>) -> Result<i32, AppError> {
     println!("Starting interactive shell session. Type 'exit' to quit.");
     let mut rl = DefaultEditor::new()?;
 
@@ -131,7 +135,7 @@ async fn run_shell_session(context: &Arc<AppContext>) -> Result<i32, AppError> {
 }
 
 /// Handles the result of the command execution, sends a final message, and returns the exit code.
-async fn handle_command_result(
+pub async fn handle_command_result(
     context: &Arc<AppContext>,
     status_result: std::io::Result<ExitStatus>,
     run_args: &RunArgs,
@@ -191,7 +195,7 @@ async fn handle_command_result(
 }
 
 /// Formats a message with the title prefix if a title is provided.
-fn format_with_title(cli: &Cli, message: &str) -> String {
+pub fn format_with_title(cli: &Cli, message: &str) -> String {
     if let Some(title) = &cli.title {
         format!("[{}] {}", title, message)
     } else {

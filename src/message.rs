@@ -2,5 +2,6 @@
 #[derive(Clone, Debug)]
 pub enum StreamMessage {
     Line(String),
+    Flush,
     CommandFinished,
 }

@@ -9,6 +9,7 @@ readme = "README.md"
 
 [dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "process"] }
+anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }
 reqwest = { version = "0.12.5", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -20,6 +21,7 @@ dirs = "6.0.0"
 
 [dev-dependencies]
 httpmock = "0.7"
+lazy_static = "1.4.0"
 
 [[bin]]
 name = "shell_hook"
@@ -28,3 +30,8 @@ path = "src/main.rs"
 [[bin]]
 name = "slh"
 path = "src/main.rs"
+
+
+[[test]]
+name = "app_tests"
+path = "tests/app_tests.rs"

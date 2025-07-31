@@ -132,3 +132,41 @@ async fn test_run_webhook_sender_sends_on_buffer_full() {
     // The mock should have been hit once
     mock.assert_hits(1);
 }
+
+#[tokio::test]
+async fn test_run_webhook_sender_flushes_on_message() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(POST).path("/");
+        then.status(200);
+    });
+
+    let context = mock_context(&server, false);
+    let (tx, rx) = mpsc::channel(100);
+
+    tx.send(StreamMessage::Line("test".to_string()))
+        .await
+        .unwrap();
+    tx.send(StreamMessage::Flush).await.unwrap();
+
+    let _ = tokio::time::timeout(Duration::from_millis(500), run_webhook_sender(context, rx)).await;
+
+    mock.assert_hits(1);
+}
+
+#[tokio::test]
+async fn test_send_payload_failure() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(POST).path("/");
+        then.status(500);
+    });
+
+    let client = Client::new();
+    let payload = json!({"text": "test"});
+
+    let result = send_payload(&client, Some(&server.url("/")), &payload, false).await;
+
+    mock.assert_hits(1);
+    assert!(result.is_err());
+}

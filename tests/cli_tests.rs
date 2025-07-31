@@ -1,9 +1,15 @@
 use clap::Parser;
 use shell_hook::cli::{Cli, Command, WebhookFormat};
 use std::env;
+use std::sync::Mutex;
+
+lazy_static::lazy_static! {
+    static ref ENV_LOCK: Mutex<()> = Mutex::new(());
+}
 
 #[test]
 fn test_cli_args_parsing() {
+    let _lock = ENV_LOCK.lock().unwrap();
     let cli = Cli::parse_from(vec![
         "shell_hook",
         "--webhook-url",
@@ -47,6 +53,7 @@ fn test_cli_args_parsing() {
 
 #[test]
 fn test_cli_args_defaults() {
+    let _lock = ENV_LOCK.lock().unwrap();
     // Temporarily clear the environment variable to test defaults
     let original_webhook_url = env::var("WEBHOOK_URL").ok();
     env::remove_var("WEBHOOK_URL");
@@ -77,6 +84,20 @@ fn test_cli_args_defaults() {
 
 #[test]
 fn test_shell_subcommand() {
+    let _lock = ENV_LOCK.lock().unwrap();
     let cli = Cli::parse_from(vec!["shell_hook", "shell"]);
     assert!(matches!(cli.command, Command::Shell));
+}
+
+#[test]
+fn test_webhook_url_from_env() {
+    let _lock = ENV_LOCK.lock().unwrap();
+    let webhook_url = "http://localhost/from-env";
+    env::set_var("WEBHOOK_URL", webhook_url);
+
+    let cli = Cli::parse_from(vec!["shell_hook", "run", "--", "echo", "hello"]);
+
+    assert_eq!(cli.webhook_url, Some(webhook_url.to_string()));
+
+    env::remove_var("WEBHOOK_URL");
 }
