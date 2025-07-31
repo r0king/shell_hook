@@ -123,3 +123,23 @@ fn test_format_with_title() {
         "Test message"
     );
 }
+
+#[tokio::test]
+async fn test_handle_command_result_signal() {
+    let cli = try_cli_from(&["shell_hook", "--dry-run", "run", "--", "echo", "hello"]).unwrap();
+    let context = Arc::new(AppContext {
+        cli: Arc::new(cli),
+        client: reqwest::Client::new(),
+    });
+    let run_args = match &context.cli.command {
+        Command::Run(args) => args,
+        _ => panic!("Expected Run command"),
+    };
+
+    // Simulate a command terminated by a signal (e.g., SIGTERM = 15)
+    let status = std::os::unix::process::ExitStatusExt::from_raw(15);
+    let result = shell_hook::app::handle_command_result(&context, Ok(status), run_args).await;
+
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 1);
+}
