@@ -28,7 +28,7 @@ pub async fn send_payload(client: &Client, webhook_url: &str, payload: &Value, i
 
 /// A convenience helper to create and send a simple text message.
 pub async fn send_message(context: &Arc<AppContext>, message: &str) {
-    if let Some(url) = &context.webhook_url {
+    if let Some(url) = context.args.webhook_url.as_deref() {
         let payload = create_payload(message, &context.args.format);
         send_payload(&context.client, url, &payload, context.args.dry_run).await;
     }
@@ -36,7 +36,7 @@ pub async fn send_message(context: &Arc<AppContext>, message: &str) {
 
 /// The core task that receives lines from a channel and sends them to the webhook in batches.
 pub async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver<StreamMessage>) {
-    if context.webhook_url.is_none() && !context.args.dry_run {
+    if context.args.webhook_url.is_none() && !context.args.dry_run {
         // Still need to drain the receiver if no webhook is set, to prevent the sender from blocking.
         while let Some(_) = rx.recv().await {}
         return;
@@ -74,7 +74,12 @@ pub async fn send_buffered_lines(context: &Arc<AppContext>, buffer: &mut Vec<Str
         return;
     }
     let combined_message = buffer.join("\n");
-    let full_message = format!("{}{}", context.title_prefix, combined_message);
+    let title_prefix = if !context.args.title.is_empty() {
+        format!("[{}] ", context.args.title)
+    } else {
+        "".to_string()
+    };
+    let full_message = format!("{}{}", title_prefix, combined_message);
     send_message(context, &full_message).await;
     buffer.clear();
 }

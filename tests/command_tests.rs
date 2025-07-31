@@ -18,10 +18,8 @@ fn create_test_context(quiet: bool, command: Vec<&str>) -> Arc<AppContext> {
     let args = Args::parse_from(raw_args);
 
     Arc::new(AppContext {
-        args,
+        args: Arc::new(args),
         client: Client::new(),
-        webhook_url: None,
-        title_prefix: "".to_string(),
     })
 }
 

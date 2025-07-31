@@ -18,10 +18,8 @@ fn mock_context(server: &MockServer, dry_run: bool) -> Arc<AppContext> {
     args.dry_run = dry_run;
 
     Arc::new(AppContext {
-        args,
+        args: Arc::new(args),
         client: Client::new(),
-        webhook_url: Some(server.url("/")),
-        title_prefix: "".to_string(),
     })
 }
 

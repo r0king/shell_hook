@@ -11,14 +11,12 @@ use tokio::sync::mpsc;
 
 /// Shared application context to avoid passing many arguments.
 pub struct AppContext {
-    pub args: Args,
+    pub args: Arc<Args>,
     pub client: Client,
-    pub webhook_url: Option<String>,
-    pub title_prefix: String,
 }
 
 pub async fn run() -> Result<i32, AppError> {
-    let args = Args::parse();
+    let args = Arc::new(Args::parse());
 
     // Validate arguments
     if args.webhook_url.is_none() && !args.dry_run {
@@ -34,10 +32,8 @@ pub async fn run() -> Result<i32, AppError> {
 
     // Create shared context
     let context = Arc::new(AppContext {
-        webhook_url: args.webhook_url.clone(),
-        args,
+        args: args.clone(),
         client: Client::new(),
-        title_prefix,
     });
 
     // --- Setup communication channel and tasks ---
@@ -45,10 +41,7 @@ pub async fn run() -> Result<i32, AppError> {
     let sender_task = tokio::spawn(run_webhook_sender(context.clone(), rx));
 
     // --- Send initial message ---
-    let start_message = format!(
-        "{}🚀 Starting command: `{}`",
-        context.title_prefix, command_str
-    );
+    let start_message = format!("{}🚀 Starting command: `{}`", title_prefix, command_str);
     println!("{}", start_message);
     send_message(&context, &start_message).await;
 
@@ -81,7 +74,7 @@ pub async fn run() -> Result<i32, AppError> {
                     None => ("❌ Command was terminated by a signal.".to_string(), true),
                 };
 
-            let final_message = format!("{}{}", context.title_prefix, base_message);
+            let final_message = format!("{}{}", title_prefix, base_message);
             if is_error {
                 eprintln!("{}", final_message);
             } else {
@@ -96,7 +89,7 @@ pub async fn run() -> Result<i32, AppError> {
                 .on_failure
                 .clone()
                 .unwrap_or_else(|| format!("❌ Command failed to start: {}.", e));
-            let final_message = format!("{}{}", context.title_prefix, base_message);
+            let final_message = format!("{}{}", title_prefix, base_message);
             eprintln!("{}", final_message);
             send_message(&context, &final_message).await;
             // Decide on an exit code for command start failure
