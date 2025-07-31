@@ -1,14 +1,14 @@
 use clap::Parser;
-use hook_stream::app::AppContext;
-use hook_stream::cli::Args;
-use hook_stream::command::run_command_and_stream;
-use hook_stream::message::StreamMessage;
+use shell_hook::app::AppContext;
+use shell_hook::cli::Args;
+use shell_hook::command::run_command_and_stream;
+use shell_hook::message::StreamMessage;
 use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
 fn create_test_context(quiet: bool, command: Vec<&str>) -> Arc<AppContext> {
-    let mut raw_args = vec!["hook-stream"];
+    let mut raw_args = vec!["shell_hook"];
     if quiet {
         raw_args.push("--quiet");
     }

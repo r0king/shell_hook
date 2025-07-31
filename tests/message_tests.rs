@@ -1,4 +1,4 @@
-use hook_stream::message::StreamMessage;
+use shell_hook::message::StreamMessage;
 
 #[test]
 fn test_stream_message_clone() {

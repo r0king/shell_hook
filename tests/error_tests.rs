@@ -1,5 +1,5 @@
-use hook_stream::error::AppError;
-use hook_stream::message::StreamMessage;
+use shell_hook::error::AppError;
+use shell_hook::message::StreamMessage;
 use std::io;
 use tokio::sync::mpsc;
 

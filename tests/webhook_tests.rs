@@ -1,8 +1,8 @@
 use clap::Parser;
-use hook_stream::app::AppContext;
-use hook_stream::cli::{Args, WebhookFormat};
-use hook_stream::message::StreamMessage;
-use hook_stream::webhook::{create_payload, run_webhook_sender, send_buffered_lines, send_payload};
+use shell_hook::app::AppContext;
+use shell_hook::cli::{Args, WebhookFormat};
+use shell_hook::message::StreamMessage;
+use shell_hook::webhook::{create_payload, run_webhook_sender, send_buffered_lines, send_payload};
 use httpmock::prelude::*;
 use httpmock::MockServer;
 use reqwest::Client;
@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 
 /// Creates a default AppContext for testing.
 fn mock_context(server: &MockServer, dry_run: bool) -> Arc<AppContext> {
-    let mut args = Args::parse_from(vec!["hook-stream", "--", "echo", "test"]);
+    let mut args = Args::parse_from(vec!["shell_hook", "--", "echo", "test"]);
     args.webhook_url = Some(server.url("/"));
     args.dry_run = dry_run;
 

@@ -1,5 +1,5 @@
 [package]
-name = "hook-stream"
+name = "shell_hook"
 version = "0.2.0"
 edition = "2021"
 authors = ["Royal Babu <123royalbabu@gmail.com>"]

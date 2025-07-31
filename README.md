@@ -1,4 +1,4 @@
-# hook-stream
+# shell_hook
 
 A powerful CLI tool to stream command output to webhooks with buffering, custom messages, and multi-platform support.
 
@@ -18,8 +18,8 @@ A powerful CLI tool to stream command output to webhooks with buffering, custom 
 
 1.  Clone the repository:
     ```sh
-    git clone https://github.com/royal-babu/hook-stream.git
-    cd hook-stream
+    git clone https://github.com/r0king/shell_hook.git
+    cd shell_hook
     ```
 2.  Build and install:
     ```sh
@@ -29,7 +29,7 @@ A powerful CLI tool to stream command output to webhooks with buffering, custom 
 ## Usage
 
 ```sh
-hook-stream [OPTIONS] -- <COMMAND>...
+shell_hook [OPTIONS] -- <COMMAND>...
 ```
 
 ## Options
@@ -60,7 +60,7 @@ Stream the output of a simple `echo` command.
 
 ```sh
 export WEBHOOK_URL="https://your-webhook-url"
-hook-stream -- ls -la
+shell_hook -- ls -la
 ```
 
 ### With a Title
@@ -68,7 +68,7 @@ hook-stream -- ls -la
 Add a title to all messages sent to the webhook.
 
 ```sh
-hook-stream --title "My Awesome Project" -- ls -la
+shell_hook --title "My Awesome Project" -- ls -la
 ```
 
 ### Custom Success and Failure Messages
@@ -76,7 +76,7 @@ hook-stream --title "My Awesome Project" -- ls -la
 Send custom messages depending on the command's exit code.
 
 ```sh
-hook-stream --on-success "Deployment complete! 🎉" --on-failure "Deployment failed. 😢" -- ./deploy.sh
+shell_hook --on-success "Deployment complete! 🎉" --on-failure "Deployment failed. 😢" -- ./deploy.sh
 ```
 
 ### Using a Different Webhook Format
@@ -84,7 +84,7 @@ hook-stream --on-success "Deployment complete! 🎉" --on-failure "Deployment fa
 Send output to a Slack webhook.
 
 ```sh
-hook-stream --format slack --webhook-url "https://hooks.slack.com/services/..." -- echo "Hello from hook-stream!"
+shell_hook --format slack --webhook-url "https://hooks.slack.com/services/..." -- echo "Hello from shell_hook!"
 ```
 
 ### Quiet Mode
@@ -92,7 +92,7 @@ hook-stream --format slack --webhook-url "https://hooks.slack.com/services/..." 
 Run a command but only get notified when it starts and finishes, not with the full output.
 
 ```sh
-hook-stream --quiet -- ./long-running-script.sh
+shell_hook --quiet -- ./long-running-script.sh
 ```
 
 ### Dry Run
@@ -100,7 +100,7 @@ hook-stream --quiet -- ./long-running-script.sh
 See what the tool would do without actually running the command or sending a webhook.
 
 ```sh
-hook-stream --dry-run --on-success "This will not be sent" -- echo "This will not run"
+shell_hook --dry-run --on-success "This will not be sent" -- echo "This will not run"
 ```
 
 ## License

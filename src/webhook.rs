@@ -22,7 +22,7 @@ pub async fn send_payload(client: &Client, webhook_url: &str, payload: &Value, i
         return;
     }
     if let Err(e) = client.post(webhook_url).json(payload).send().await {
-        eprintln!("[hook-stream] Error sending to webhook: {}", e);
+        eprintln!("[shell_hook] Error sending to webhook: {}", e);
     }
 }
 

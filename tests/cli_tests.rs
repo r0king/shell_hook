@@ -1,10 +1,10 @@
 use clap::Parser;
-use hook_stream::cli::{Args, WebhookFormat};
+use shell_hook::cli::{Args, WebhookFormat};
 
 #[test]
 fn test_cli_args_parsing() {
     let args = Args::parse_from(vec![
-        "hook-stream",
+        "shell_hook",
         "--webhook-url",
         "http://localhost",
         "--on-success",
@@ -40,7 +40,7 @@ fn test_cli_args_parsing() {
 
 #[test]
 fn test_cli_args_defaults() {
-    let args = Args::parse_from(vec!["hook-stream", "--", "echo", "hello"]);
+    let args = Args::parse_from(vec!["shell_hook", "--", "echo", "hello"]);
 
     assert_eq!(args.webhook_url, None);
     assert_eq!(args.on_success, None);
