@@ -105,13 +105,28 @@ fn test_webhook_url_from_env() {
 #[test]
 fn test_webhook_format_enum() {
     let _lock = ENV_LOCK.lock().unwrap();
-    let cli_google = Cli::parse_from(vec!["shell_hook", "--format", "google-chat", "run", "--", "echo", "hello"]);
+    let cli_google = Cli::parse_from(vec![
+        "shell_hook",
+        "--format",
+        "google-chat",
+        "run",
+        "--",
+        "echo",
+        "hello",
+    ]);
     assert!(matches!(cli_google.format, WebhookFormat::GoogleChat));
 
-    let cli_slack = Cli::parse_from(vec!["shell_hook", "--format", "slack", "run", "--", "echo", "hello"]);
+    let cli_slack = Cli::parse_from(vec![
+        "shell_hook",
+        "--format",
+        "slack",
+        "run",
+        "--",
+        "echo",
+        "hello",
+    ]);
     assert!(matches!(cli_slack.format, WebhookFormat::Slack));
 }
-
 
 #[test]
 fn test_derived_traits() {
@@ -144,11 +159,21 @@ fn test_derived_traits() {
     assert!(matches!(default_format, WebhookFormat::GoogleChat));
 }
 
-
 #[test]
 fn test_cli_long_about() {
     let _lock = ENV_LOCK.lock().unwrap();
     let cli = Cli::parse_from(vec!["shell_hook", "help"]);
     let help_text = format!("{:?}", cli);
     assert!(help_text.contains("A powerful CLI tool to stream command output to webhooks"));
+}
+
+#[test]
+fn test_run_subcommand_help() {
+    let _lock = ENV_LOCK.lock().unwrap();
+    let cli = Cli::parse_from(vec!["shell_hook", "help", "run"]);
+    let help_text = format!("{:?}", cli);
+    assert!(help_text.contains("Run a single command and stream its output"));
+    assert!(help_text.contains("--on-success"));
+    assert!(help_text.contains("--on-failure"));
+    assert!(help_text.contains("--quiet"));
 }

@@ -80,6 +80,18 @@ pub async fn run_single_command(
     handle_command_result(context, status_result, run_args).await
 }
 
+/// Processes a single line of input from the shell session.
+pub async fn process_shell_command(context: &Arc<AppContext>, line: &str) -> Result<i32, AppError> {
+    let run_args = crate::cli::RunArgs {
+        command: vec![line.to_string()],
+        on_success: None,
+        on_failure: None,
+        quiet: false,
+    };
+
+    run_single_command(context, &run_args).await
+}
+
 pub async fn run_shell_session(context: &Arc<AppContext>) -> Result<i32, AppError> {
     println!("Starting interactive shell session. Type 'exit' to quit.");
     let mut rl = DefaultEditor::new()?;
@@ -106,14 +118,7 @@ pub async fn run_shell_session(context: &Arc<AppContext>) -> Result<i32, AppErro
                     break;
                 }
 
-                let run_args = RunArgs {
-                    command: vec![line.to_string()],
-                    on_success: None,
-                    on_failure: None,
-                    quiet: false,
-                };
-
-                if let Err(e) = run_single_command(context, &run_args).await {
+                if let Err(e) = process_shell_command(context, line).await {
                     eprintln!("[shell_hook] Error executing command: {}", e);
                 }
             }

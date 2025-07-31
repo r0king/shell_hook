@@ -1,13 +1,21 @@
-use shell_hook::app;
+use std::process::Command;
 
-#[tokio::test]
-async fn test_run_app_success() {
-    let result = app::run_from(vec!["shell_hook", "--dry-run", "run", "echo", "hello"]).await;
-    assert_eq!(result.unwrap(), 0);
+#[test]
+fn test_main_binary_success() {
+    let output = Command::new("cargo")
+        .args(&["run", "--bin", "shell_hook", "--", "--webhook-url", "http://localhost", "run", "--", "echo", "hello"])
+        .output()
+        .expect("failed to execute process");
+
+    assert!(output.status.success());
 }
 
-#[tokio::test]
-async fn test_run_app_error() {
-    let result = app::run_from(vec!["shell_hook", "run"]).await;
-    assert!(result.is_err());
+#[test]
+fn test_main_binary_error() {
+    let output = Command::new("cargo")
+        .args(&["run", "--bin", "shell_hook", "--", "run"])
+        .output()
+        .expect("failed to execute process");
+
+    assert!(!output.status.success());
 }

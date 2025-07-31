@@ -1,5 +1,3 @@
-
-
 #[tokio::main]
 async fn main() {
     let result = shell_hook::app::run().await;
@@ -12,5 +10,3 @@ async fn main() {
         }
     }
 }
-
- 
