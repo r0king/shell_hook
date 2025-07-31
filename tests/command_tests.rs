@@ -37,7 +37,7 @@ async fn collect_messages(mut rx: mpsc::Receiver<StreamMessage>) -> Vec<StreamMe
 #[tokio::test]
 async fn test_run_command_success() {
     let run_args = RunArgs {
-        command: vec!["echo".to_string(), "hello world".to_string()],
+        command: vec!["echo hello world".to_string()],
         quiet: false,
         on_success: None,
         on_failure: None,
@@ -62,7 +62,7 @@ async fn test_run_command_success() {
 #[tokio::test]
 async fn test_run_command_with_stderr() {
     let run_args = RunArgs {
-        command: vec!["sh".to_string(), "-c".to_string(), "echo 'error message' >&2".to_string()],
+        command: vec!["echo 'error message' >&2".to_string()],
         quiet: false,
         on_success: None,
         on_failure: None,
@@ -85,7 +85,7 @@ async fn test_run_command_with_stderr() {
 #[tokio::test]
 async fn test_run_command_failure() {
     let run_args = RunArgs {
-        command: vec!["sh".to_string(), "-c".to_string(), "exit 1".to_string()],
+        command: vec!["exit 1".to_string()],
         quiet: false,
         on_success: None,
         on_failure: None,
@@ -105,7 +105,7 @@ async fn test_run_command_failure() {
 #[tokio::test]
 async fn test_run_command_quiet_mode() {
     let run_args = RunArgs {
-        command: vec!["echo".to_string(), "hello world".to_string()],
+        command: vec!["echo hello world".to_string()],
         quiet: true,
         on_success: None,
         on_failure: None,

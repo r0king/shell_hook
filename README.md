@@ -12,7 +12,7 @@ It's perfect for monitoring long-running processes, getting build notifications,
   
   ![Demo](https://github.com/r0king/shell_hook/assets/18419334/531d0411-92ba-4475-b072-a08b5f259695)
 
-- **Interactive Shell Mode**: Launch a persistent session for running multiple commands without exiting.
+- **Interactive Shell Mode**: Launch a persistent session for running multiple commands without exiting. All commands are executed in a shell, so you can use pipes and other shell features.
 - **Smart Buffering**: Avoid rate-limiting issues with intelligent line buffering. Output is sent in batches based on size or time, ensuring you never miss a line.
 - **Customizable Messages**: Tailor notifications for command success or failure. Provide context and clarity with custom titles and messages.
 - **Webhook Agnostic**: Supports popular webhook formats like Google Chat and Slack out of the box.
@@ -51,7 +51,7 @@ With ShellHook, you can:
     ```
 2.  **Run a command**:
     ```sh
-    shell_hook run --title "My First Job" --on-success "It worked! ✅" -- ls -la
+    shell_hook run --title "My First Job" --on-success "It worked! ✅" -- "ls -la"
     ```
 
 This will run `ls -la`, stream its output to your webhook, and send a "It worked! ✅" message upon completion.
@@ -61,7 +61,7 @@ This will run `ls -la`, stream its output to your webhook, and send a "It worked
 ### Run a single command
 
 ```sh
-shell_hook run [OPTIONS] -- <COMMAND>...
+shell_hook run [OPTIONS] -- <COMMAND>
 ```
 
 ### Start an interactive shell
@@ -88,7 +88,7 @@ shell_hook shell
 | `--on-success <MSG>` | Custom message to send on command success. |
 | `--on-failure <MSG>` | Custom message to send on command failure. |
 | `-q`, `--quiet` | Suppress streaming of stdout/stderr to the webhook. |
-| `<COMMAND>...` | The command to execute and stream. |
+| `<COMMAND>` | The command to execute and stream. The command is executed within a shell, so you can use pipes and other shell features. |
 
 ## Webhook Formats
 

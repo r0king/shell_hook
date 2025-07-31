@@ -97,20 +97,8 @@ async fn run_shell_session(context: &Arc<AppContext>) -> Result<i32, AppError> {
                     break;
                 }
 
-                let command_parts = match shlex::split(line) {
-                    Some(parts) => parts,
-                    None => {
-                        eprintln!("[shell_hook] Error: Invalid quoting in command.");
-                        continue;
-                    }
-                };
-
-                if command_parts.is_empty() {
-                    continue;
-                }
-
                 let run_args = RunArgs {
-                    command: command_parts,
+                    command: vec![line.to_string()],
                     on_success: None,
                     on_failure: None,
                     quiet: false,

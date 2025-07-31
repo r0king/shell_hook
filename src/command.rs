@@ -13,8 +13,13 @@ pub async fn run_command_and_stream(
     tx: mpsc::Sender<StreamMessage>,
     run_args: &RunArgs,
 ) -> std::io::Result<ExitStatus> {
-    let mut child = Command::new(&run_args.command[0])
-        .args(&run_args.command[1..])
+    // For the `run` subcommand, we execute the command directly.
+    // For the `shell` subcommand, we wrap the command in `sh -c`.
+    // This is now handled in `app.rs` by creating the appropriate command vector.
+    let command_str = run_args.command.join(" ");
+    let mut child = Command::new("sh")
+        .arg("-c")
+        .arg(&command_str)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
