@@ -1,6 +1,6 @@
 use crate::app::AppContext;
-use crate::message::StreamMessage;
 use crate::cli::WebhookFormat;
+use crate::message::StreamMessage;
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -69,7 +69,7 @@ pub async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver
 }
 
 /// Sends the current buffer of lines as a single webhook message.
-async fn send_buffered_lines(context: &Arc<AppContext>, buffer: &mut Vec<String>) {
+pub async fn send_buffered_lines(context: &Arc<AppContext>, buffer: &mut Vec<String>) {
     if buffer.is_empty() {
         return;
     }

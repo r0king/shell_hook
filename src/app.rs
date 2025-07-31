@@ -9,8 +9,6 @@ use std::io::ErrorKind;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-
-
 /// Shared application context to avoid passing many arguments.
 pub struct AppContext {
     pub args: Args,
@@ -64,25 +62,24 @@ pub async fn run() -> Result<i32, AppError> {
     match status_result {
         Ok(status) => {
             let exit_code = status.code().unwrap_or(1);
-            let (base_message, is_error) = match status.code() {
-                Some(0) => (
-                    context
-                        .args
-                        .on_success
-                        .clone()
-                        .unwrap_or_else(|| "✅ Command finished successfully.".to_string()),
-                    false,
-                ),
-                Some(code) => (
-                    context
-                        .args
-                        .on_failure
-                        .clone()
-                        .unwrap_or_else(|| format!("❌ Command failed with exit code {}.", code)),
-                    true,
-                ),
-                None => ("❌ Command was terminated by a signal.".to_string(), true),
-            };
+            let (base_message, is_error) =
+                match status.code() {
+                    Some(0) => (
+                        context
+                            .args
+                            .on_success
+                            .clone()
+                            .unwrap_or_else(|| "✅ Command finished successfully.".to_string()),
+                        false,
+                    ),
+                    Some(code) => (
+                        context.args.on_failure.clone().unwrap_or_else(|| {
+                            format!("❌ Command failed with exit code {}.", code)
+                        }),
+                        true,
+                    ),
+                    None => ("❌ Command was terminated by a signal.".to_string(), true),
+                };
 
             let final_message = format!("{}{}", context.title_prefix, base_message);
             if is_error {
@@ -94,9 +91,11 @@ pub async fn run() -> Result<i32, AppError> {
             Ok(exit_code)
         }
         Err(e) => {
-            let base_message = context.args.on_failure.clone().unwrap_or_else(|| {
-                format!("❌ Command failed to start: {}.", e)
-            });
+            let base_message = context
+                .args
+                .on_failure
+                .clone()
+                .unwrap_or_else(|| format!("❌ Command failed to start: {}.", e));
             let final_message = format!("{}{}", context.title_prefix, base_message);
             eprintln!("{}", final_message);
             send_message(&context, &final_message).await;

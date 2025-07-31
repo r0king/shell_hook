@@ -1,9 +1,4 @@
-mod app;
-mod cli;
-mod command;
-mod error;
-mod webhook;
-mod message;
+use hook_stream::app;
 
 #[tokio::main]
 async fn main() {
