@@ -17,6 +17,10 @@ fn test_cli_args_parsing() {
         "--dry-run",
         "--format",
         "slack",
+        "--buffer-size",
+        "20",
+        "--buffer-timeout",
+        "5.0",
         "--",
         "ls",
         "-la",
@@ -30,6 +34,8 @@ fn test_cli_args_parsing() {
     assert!(args.dry_run);
     assert!(matches!(args.format, WebhookFormat::Slack));
     assert_eq!(args.command, vec!["ls", "-la"]);
+    assert_eq!(args.buffer_size, 20);
+    assert_eq!(args.buffer_timeout, 5.0);
 }
 
 #[test]
@@ -44,4 +50,6 @@ fn test_cli_args_defaults() {
     assert!(!args.dry_run);
     assert!(matches!(args.format, WebhookFormat::GoogleChat));
     assert_eq!(args.command, vec!["echo", "hello"]);
+    assert_eq!(args.buffer_size, 10);
+    assert_eq!(args.buffer_timeout, 2.0);
 }

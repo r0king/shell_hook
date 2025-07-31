@@ -38,6 +38,14 @@ pub struct Args {
     #[arg(long, value_enum, default_value_t=WebhookFormat::GoogleChat)]
     pub format: WebhookFormat,
 
+    /// Max number of lines to buffer before sending a webhook message.
+    #[arg(long, default_value_t = 10, value_name = "COUNT")]
+    pub buffer_size: usize,
+
+    /// Max time in seconds to wait before flushing the buffer.
+    #[arg(long, default_value_t = 2.0, value_name = "SECONDS")]
+    pub buffer_timeout: f64,
+
     /// The command to execute and stream its output.
     #[arg(required = true, last = true, value_name = "COMMAND")]
     pub command: Vec<String>,

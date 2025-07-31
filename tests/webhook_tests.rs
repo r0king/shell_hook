@@ -88,7 +88,11 @@ async fn test_run_webhook_sender_sends_on_timeout() {
         .unwrap();
 
     // Run the sender, but timeout before it can complete
-    let _ = tokio::time::timeout(Duration::from_secs(3), run_webhook_sender(context, rx)).await;
+    let _ = tokio::time::timeout(
+        Duration::from_secs_f64(context.args.buffer_timeout + 1.0),
+        run_webhook_sender(context, rx),
+    )
+    .await;
 
     // The mock should have been hit once due to the timeout
     mock.assert_hits(1);
@@ -104,9 +108,7 @@ async fn test_run_webhook_sender_sends_on_buffer_full() {
 
     let context = mock_context(&server, false);
     let (tx, rx) = mpsc::channel(100);
-    let buffer_max_size = 10;
-
-    for i in 0..buffer_max_size {
+    for i in 0..context.args.buffer_size {
         tx.send(StreamMessage::Line(format!("line {}", i)))
             .await
             .unwrap();

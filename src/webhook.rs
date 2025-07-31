@@ -43,8 +43,8 @@ pub async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver
     }
 
     let mut buffer = Vec::new();
-    let buffer_timeout = Duration::from_secs(2);
-    let buffer_max_size = 10;
+    let buffer_timeout = Duration::from_secs_f64(context.args.buffer_timeout);
+    let buffer_max_size = context.args.buffer_size;
 
     loop {
         match tokio::time::timeout(buffer_timeout, rx.recv()).await {
