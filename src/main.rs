@@ -1,13 +1,55 @@
 use clap::{Parser, ValueEnum};
 use reqwest::Client;
 use serde_json::{json, Value};
-use std::env;
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc;
+
+/// A powerful CLI tool to stream command output to webhooks with buffering,
+/// custom messages, and multi-platform support.
+#[derive(Parser, Debug)]
+#[command(
+    author, // Reads from Cargo.toml
+    version, // Reads from Cargo.toml
+    about, // Reads from Cargo.toml's description
+    long_about = None
+)]
+struct Args {
+    /// The webhook URL to send messages to. Can also be set via the WEBHOOK_URL environment variable.
+    #[arg(long, env = "WEBHOOK_URL", value_name = "URL")]
+    webhook_url: Option<String>,
+
+    /// Custom message to send on command success.
+    #[arg(long, value_name = "MESSAGE")]
+    on_success: Option<String>,
+
+    /// Custom message to send on command failure.
+    #[arg(long, value_name = "MESSAGE")]
+    on_failure: Option<String>,
+
+    /// Suppress streaming of stdout/stderr to the webhook (start/finish messages are still sent).
+    #[arg(short, long)]
+    quiet: bool,
+
+    /// A title to prepend to all messages, e.g., "[My Project]".
+    #[arg(short, long, default_value = "", value_name = "TITLE")]
+    title: String,
+
+    /// Don't execute the command or send webhooks; just print what would be done.
+    #[arg(long)]
+    dry_run: bool,
+
+    /// The format of the webhook payload.
+    #[arg(long, value_enum, default_value_t=WebhookFormat::GoogleChat)]
+    format: WebhookFormat,
+
+    /// The command to execute and stream its output.
+    #[arg(required = true, last = true, value_name = "COMMAND")]
+    command: Vec<String>,
+}
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 enum WebhookFormat {
@@ -15,28 +57,19 @@ enum WebhookFormat {
     GoogleChat,
     Slack,
 }
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    #[arg(long)]
-    on_success: Option<String>,
-    #[arg(long)]
-    on_failure: Option<String>,
-    #[arg(short, long, default_value_t = false)]
-    quiet: bool,
-    #[arg(short, long, default_value = "")]
-    title: String,
-    #[arg(long, default_value_t = false)]
-    dry_run: bool,
-    #[arg(long, value_enum, default_value_t=WebhookFormat::GoogleChat)]
-    format: WebhookFormat,
-    #[arg(required = true, last = true)]
-    command: Vec<String>,
-}
 
-enum Message {
+/// An enum to pass messages from the command runners to the webhook sender.
+enum StreamMessage {
     Line(String),
     CommandFinished,
+}
+
+/// Shared application context to avoid passing many arguments.
+struct AppContext {
+    args: Args,
+    client: Client,
+    webhook_url: String,
+    title_prefix: String,
 }
 
 /// Creates a JSON payload for a given message and format.
@@ -47,7 +80,7 @@ fn create_payload(message: &str, format: &WebhookFormat) -> Value {
     }
 }
 
-/// Generic function to send a pre-formatted payload.
+/// Sends a pre-formatted payload to a webhook URL.
 async fn send_payload(client: &Client, webhook_url: &str, payload: &Value, is_dry_run: bool) {
     if is_dry_run {
         println!("[DRY RUN] Would send to webhook: {}", payload);
@@ -58,172 +91,171 @@ async fn send_payload(client: &Client, webhook_url: &str, payload: &Value, is_dr
     }
 }
 
-/// Sends a batch of stdout/stderr lines to the configured webhook.
-async fn send_stream_batch(client: &Client, webhook_url: &str, batch: &[String], args: &Args) {
-    if batch.is_empty() {
+/// A convenience helper to create and send a simple text message.
+async fn send_message(context: &Arc<AppContext>, message: &str) {
+    let payload = create_payload(message, &context.args.format);
+    send_payload(
+        &context.client,
+        &context.webhook_url,
+        &payload,
+        context.args.dry_run,
+    )
+    .await;
+}
+
+/// The core task that receives lines from a channel and sends them to the webhook in batches.
+async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver<StreamMessage>) {
+    let mut buffer = Vec::new();
+    let buffer_timeout = Duration::from_secs(2);
+    let buffer_max_size = 10;
+
+    loop {
+        match tokio::time::timeout(buffer_timeout, rx.recv()).await {
+            // Received a line, add to buffer and send if full
+            Ok(Some(StreamMessage::Line(line))) => {
+                buffer.push(line);
+                if buffer.len() >= buffer_max_size {
+                    send_buffered_lines(&context, &mut buffer).await;
+                }
+            }
+            // Timeout elapsed, send what we have
+            Err(_) => {
+                send_buffered_lines(&context, &mut buffer).await;
+            }
+            // Command finished or channel closed, send remainder and exit
+            Ok(Some(StreamMessage::CommandFinished)) | Ok(None) => {
+                send_buffered_lines(&context, &mut buffer).await;
+                break;
+            }
+        }
+    }
+}
+
+/// Sends the current buffer of lines as a single webhook message.
+async fn send_buffered_lines(context: &Arc<AppContext>, buffer: &mut Vec<String>) {
+    if buffer.is_empty() {
         return;
     }
+    let combined_message = buffer.join("\n");
+    let full_message = format!("{}{}", context.title_prefix, combined_message);
+    send_message(context, &full_message).await;
+    buffer.clear();
+}
 
-    let combined_message = batch.join("\n");
+/// Spawns the command, captures its stdout/stderr, and sends lines to the channel.
+async fn run_command_and_stream(
+    context: Arc<AppContext>,
+    tx: mpsc::Sender<StreamMessage>,
+) -> std::io::Result<ExitStatus> {
+    let mut child = Command::new(&context.args.command[0])
+        .args(&context.args.command[1..])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+
+    // Spawn tasks to read stdout and stderr concurrently
+    let tx_out = tx.clone();
+    let quiet_mode = context.args.quiet;
+    let stdout_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            println!("{}", line);
+            if !quiet_mode {
+                if tx_out.send(StreamMessage::Line(line)).await.is_err() {
+                    break; // Receiver has been dropped
+                }
+            }
+        }
+    });
+
+    let tx_err = tx.clone();
+    let stderr_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            eprintln!("{}", line);
+            if !quiet_mode {
+                if tx_err.send(StreamMessage::Line(line)).await.is_err() {
+                    break; // Receiver has been dropped
+                }
+            }
+        }
+    });
+
+    // Wait for the command to complete and for readers to finish
+    let status = child.wait().await?;
+    let _ = stdout_task.await;
+    let _ = stderr_task.await;
+
+    // Signal that the command is done
+    let _ = tx.send(StreamMessage::CommandFinished).await;
+
+    Ok(status)
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+
+    // Validate arguments
+    let webhook_url = match &args.webhook_url {
+        Some(url) => url.clone(),
+        None if !args.dry_run => {
+            eprintln!("[hook-stream] Critical Error: --webhook-url or WEBHOOK_URL environment variable must be set.");
+            eprintln!("\nFor more information, try '--help'.");
+            std::process::exit(2);
+        }
+        _ => "dry-run-placeholder".to_string(), // Placeholder for dry-run
+    };
+
+    let command_str = args.command.join(" ");
     let title_prefix = if !args.title.is_empty() {
         format!("[{}] ", args.title)
     } else {
         "".to_string()
     };
 
-    // This function is now ONLY for stream output, not final messages.
-    let full_message = format!("{}{}", title_prefix, combined_message);
-
-    let payload = create_payload(&full_message, &args.format);
-    send_payload(client, webhook_url, &payload, args.dry_run).await;
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
-    let webhook_url = if args.dry_run {
-        "dry-run".to_string()
-    } else {
-        match env::var("WEBHOOK_URL") {
-            Ok(url) => url,
-            Err(_) => {
-                eprintln!(
-                    "[hook-stream] Critical Error: WEBHOOK_URL environment variable must be set."
-                );
-                std::process::exit(2);
-            }
-        }
-    };
-    if args.command.is_empty() {
-        eprintln!("[hook-stream] Error: No command provided after '--'.");
-        std::process::exit(1);
-    }
-
-    let command_str = args.command.join(" ");
-    let http_client = Client::new();
-    let (tx, mut rx) = mpsc::channel::<Message>(100);
-
-    let sender_args = Arc::new(args);
-    let sender_client = http_client.clone();
-    let sender_webhook_url = webhook_url.clone();
-
-    let sender_args_clone = Arc::clone(&sender_args);
-    // The sender task now uses the refactored function
-    let sender_task = tokio::spawn(async move {
-        let mut buffer = Vec::new();
-        let buffer_timeout = Duration::from_secs(2);
-
-        loop {
-            match tokio::time::timeout(buffer_timeout, rx.recv()).await {
-                Ok(Some(Message::Line(line))) => {
-                    buffer.push(line);
-                    if buffer.len() >= 10 {
-                        send_stream_batch(
-                            &sender_client,
-                            &sender_webhook_url,
-                            &buffer,
-                            &sender_args_clone,
-                        )
-                        .await;
-                        buffer.clear();
-                    }
-                }
-                Err(_) => {
-                    if !buffer.is_empty() {
-                        send_stream_batch(
-                            &sender_client,
-                            &sender_webhook_url,
-                            &buffer,
-                            &sender_args_clone,
-                        )
-                        .await;
-                        buffer.clear();
-                    }
-                }
-                Ok(Some(Message::CommandFinished)) | Ok(None) => {
-                    if !buffer.is_empty() {
-                        send_stream_batch(
-                            &sender_client,
-                            &sender_webhook_url,
-                            &buffer,
-                            &sender_args_clone,
-                        )
-                        .await;
-                        buffer.clear();
-                    }
-                    break;
-                }
-            }
-        }
+    // Create shared context
+    let context = Arc::new(AppContext {
+        args,
+        client: Client::new(),
+        webhook_url,
+        title_prefix,
     });
 
-    // --- Spawn Command and Start Streaming ---
-    let title_prefix = if !sender_args.title.is_empty() {
-        format!("[{}] ", sender_args.title)
-    } else {
-        "".to_string()
-    };
+    // --- Setup communication channel and tasks ---
+    let (tx, rx) = mpsc::channel::<StreamMessage>(100);
+    let sender_task = tokio::spawn(run_webhook_sender(context.clone(), rx));
 
-    // The start message is now also handled correctly
-    let start_message = format!("{}🚀 Starting command: `{}`", title_prefix, command_str);
+    // --- Send initial message ---
+    let start_message = format!(
+        "{}🚀 Starting command: `{}`",
+        context.title_prefix, command_str
+    );
     println!("{}", start_message);
-    let start_payload = create_payload(&start_message, &sender_args.format);
-    send_payload(
-        &http_client,
-        &webhook_url,
-        &start_payload,
-        sender_args.dry_run,
-    )
-    .await;
+    send_message(&context, &start_message).await;
 
-    let mut child = Command::new(&sender_args.command[0])
-        .args(&sender_args.command[1..])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    // --- Run command and stream output ---
+    let status = run_command_and_stream(context.clone(), tx).await?;
 
-    // ... (The stdout/stderr reader tasks and child.wait() logic remains IDENTICAL) ...
-    let stdout = child.stdout.take().unwrap();
-    let stderr = child.stderr.take().unwrap();
-    let mut stdout_reader = BufReader::new(stdout).lines();
-    let mut stderr_reader = BufReader::new(stderr).lines();
-    let tx_out = tx.clone();
-    let tx_err = tx.clone();
-    let quiet_mode = sender_args.quiet;
-    let stdout_task = tokio::spawn(async move {
-        while let Ok(Some(line)) = stdout_reader.next_line().await {
-            println!("{}", line);
-            if !quiet_mode {
-                let _ = tx_out.send(Message::Line(line)).await;
-            }
-        }
-    });
-    let stderr_task = tokio::spawn(async move {
-        while let Ok(Some(line)) = stderr_reader.next_line().await {
-            eprintln!("{}", line);
-            if !quiet_mode {
-                let _ = tx_err.send(Message::Line(line)).await;
-            }
-        }
-    });
-    let status = child.wait().await?;
-    let _ = stdout_task.await;
-    let _ = stderr_task.await;
-    let _ = tx.send(Message::CommandFinished).await;
-    let _ = sender_task.await;
+    // --- Wait for sender to finish sending buffered messages ---
+    sender_task.await?;
 
-    // --- Final Status ---
-    // This logic is now cleaner
-    let (base_message, _is_error) = match status.code() {
+    // --- Send final status message ---
+    let (base_message, is_error) = match status.code() {
         Some(0) => (
-            sender_args
+            context
+                .args
                 .on_success
                 .clone()
                 .unwrap_or_else(|| "✅ Command finished successfully.".to_string()),
             false,
         ),
         Some(code) => (
-            sender_args
+            context
+                .args
                 .on_failure
                 .clone()
                 .unwrap_or_else(|| format!("❌ Command failed with exit code {}.", code)),
@@ -232,17 +264,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None => ("❌ Command was terminated by a signal.".to_string(), true),
     };
 
-    let final_message = format!("{}{}", title_prefix, base_message);
-    println!("{}", final_message);
-
-    let final_payload = create_payload(&final_message, &sender_args.format);
-    send_payload(
-        &http_client,
-        &webhook_url,
-        &final_payload,
-        sender_args.dry_run,
-    )
-    .await;
+    let final_message = format!("{}{}", context.title_prefix, base_message);
+    if is_error {
+        eprintln!("{}", final_message);
+    } else {
+        println!("{}", final_message);
+    }
+    send_message(&context, &final_message).await;
 
     if let Some(code) = status.code() {
         std::process::exit(code);
