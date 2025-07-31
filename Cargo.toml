@@ -17,3 +17,11 @@ thiserror = "2"
 
 [dev-dependencies]
 httpmock = "0.7"
+
+[[bin]]
+name = "shell_hook"
+path = "src/main.rs"
+
+[[bin]]
+name = "slh"
+path = "src/main.rs"
