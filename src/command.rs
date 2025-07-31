@@ -17,23 +17,19 @@ pub async fn run_command_and_stream(
         .stderr(Stdio::piped())
         .spawn()?;
 
-    let stdout_task = stream_output(
-        child.stdout.take().unwrap(),
-        tx.clone(),
-        context.args.quiet,
-        false,
-    );
-    let stderr_task = stream_output(
-        child.stderr.take().unwrap(),
-        tx.clone(),
-        context.args.quiet,
-        true,
-    );
+    let mut tasks = Vec::new();
+    if let Some(stdout) = child.stdout.take() {
+        tasks.push(stream_output(stdout, tx.clone(), context.args.quiet, false));
+    }
+    if let Some(stderr) = child.stderr.take() {
+        tasks.push(stream_output(stderr, tx.clone(), context.args.quiet, true));
+    }
 
     // Wait for the command to complete and for readers to finish
     let status = child.wait().await?;
-    let _ = stdout_task.await;
-    let _ = stderr_task.await;
+    for task in tasks {
+        let _ = task.await;
+    }
 
     // Signal that the command is done
     let _ = tx.send(StreamMessage::CommandFinished).await;

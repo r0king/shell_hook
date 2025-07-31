@@ -57,20 +57,3 @@ pub enum WebhookFormat {
     GoogleChat,
     Slack,
 }
-
-impl Default for Args {
-    fn default() -> Self {
-        Self {
-            webhook_url: None,
-            on_success: None,
-            on_failure: None,
-            quiet: false,
-            title: None,
-            dry_run: false,
-            format: WebhookFormat::default(),
-            buffer_size: 10,
-            buffer_timeout: 2.0,
-            command: Vec::new(),
-        }
-    }
-}

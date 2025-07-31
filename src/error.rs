@@ -13,4 +13,7 @@ pub enum AppError {
 
     #[error(transparent)]
     TaskJoin(#[from] tokio::task::JoinError),
+
+    #[error("Webhook request failed: {0}")]
+    WebhookError(#[from] reqwest::Error),
 }

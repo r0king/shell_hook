@@ -10,6 +10,8 @@ use std::process::ExitStatus;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+const CHANNEL_BUFFER_SIZE: usize = 100;
+
 /// Shared application context to avoid passing many arguments.
 pub struct AppContext {
     pub args: Arc<Args>,
@@ -31,7 +33,7 @@ pub async fn run() -> Result<i32, AppError> {
     });
 
     // --- Setup communication channel and tasks ---
-    let (tx, rx) = mpsc::channel::<StreamMessage>(100);
+    let (tx, rx) = mpsc::channel::<StreamMessage>(CHANNEL_BUFFER_SIZE);
     let sender_task = tokio::spawn(run_webhook_sender(context.clone(), rx));
 
     // --- Send initial message ---
@@ -39,7 +41,9 @@ pub async fn run() -> Result<i32, AppError> {
     let start_message =
         format_with_title(&args, &format!("🚀 Starting command: `{}`", command_str));
     println!("{}", start_message);
-    send_message(&context, &start_message).await;
+    if let Err(e) = send_message(&context, &start_message).await {
+        eprintln!("[shell_hook] Warning: Failed to send start message: {}", e);
+    }
 
     // --- Run command and stream output ---
     let status_result = run_command_and_stream(context.clone(), tx).await;
@@ -84,7 +88,9 @@ async fn handle_command_result(
             } else {
                 println!("{}", final_message);
             }
-            send_message(context, &final_message).await;
+            if let Err(e) = send_message(context, &final_message).await {
+                eprintln!("[shell_hook] Warning: Failed to send final message: {}", e);
+            }
             Ok(exit_code)
         }
         Err(e) => {
@@ -95,7 +101,12 @@ async fn handle_command_result(
                 .unwrap_or_else(|| format!("❌ Command failed to start: {}.", e));
             let final_message = format_with_title(&context.args, &base_message);
             eprintln!("{}", final_message);
-            send_message(context, &final_message).await;
+            if let Err(e) = send_message(context, &final_message).await {
+                eprintln!(
+                    "[shell_hook] Warning: Failed to send failure message: {}",
+                    e
+                );
+            }
             // Decide on an exit code for command start failure
             match e.kind() {
                 ErrorKind::NotFound => Ok(127),

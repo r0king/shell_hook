@@ -1,6 +1,6 @@
 use reqwest::Client;
 use shell_hook::app::AppContext;
-use shell_hook::cli::Args;
+use shell_hook::cli::{Args, WebhookFormat};
 use shell_hook::command::run_command_and_stream;
 use shell_hook::message::StreamMessage;
 use std::sync::Arc;
@@ -10,7 +10,14 @@ fn create_test_context(command: Vec<&str>, quiet: bool) -> Arc<AppContext> {
     let args = Args {
         command: command.into_iter().map(String::from).collect(),
         quiet,
-        ..Default::default()
+        webhook_url: None,
+        on_success: None,
+        on_failure: None,
+        title: None,
+        dry_run: false,
+        format: WebhookFormat::GoogleChat,
+        buffer_size: 10,
+        buffer_timeout: 2.0,
     };
     Arc::new(AppContext {
         args: Arc::new(args),

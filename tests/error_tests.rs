@@ -26,5 +26,39 @@ async fn test_mpsc_error() {
     drop(rx);
     let send_error = tx.send(StreamMessage::CommandFinished).await.unwrap_err();
     let app_error = AppError::from(send_error);
-    assert_eq!(app_error.to_string(), "Failed to send message to the channel");
+    assert_eq!(
+        app_error.to_string(),
+        "Failed to send message to the channel"
+    );
+}
+
+#[tokio::test]
+async fn test_task_join_error() {
+    let task = tokio::spawn(async {
+        panic!("Task panicked for testing purposes");
+    });
+
+    // Await the task and expect a JoinError
+    let join_error = task.await.unwrap_err();
+    let app_error = AppError::from(join_error);
+
+    // Assert that the error is the correct variant and that it was caused by a panic
+    match app_error {
+        AppError::TaskJoin(e) => {
+            assert!(e.is_panic());
+        }
+        _ => panic!("Expected AppError::TaskJoin, but got {:?}", app_error),
+    }
+}
+
+#[tokio::test]
+async fn test_webhook_error() {
+    // Create a mock reqwest error
+    let reqwest_error = reqwest::Client::new()
+        .get("http://invalid-url-that-will-not-resolve")
+        .send()
+        .await
+        .unwrap_err();
+    let app_error = AppError::from(reqwest_error);
+    assert!(app_error.to_string().starts_with("Webhook request failed"));
 }

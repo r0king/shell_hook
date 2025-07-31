@@ -16,7 +16,13 @@ fn mock_context(server: &MockServer, dry_run: bool) -> Arc<AppContext> {
         webhook_url: Some(server.url("/")),
         dry_run,
         command: vec!["echo".to_string(), "test".to_string()],
-        ..Default::default()
+        on_success: None,
+        on_failure: None,
+        quiet: false,
+        title: None,
+        format: WebhookFormat::GoogleChat,
+        buffer_size: 10,
+        buffer_timeout: 2.0,
     };
 
     Arc::new(AppContext {
@@ -51,7 +57,7 @@ async fn test_send_payload_dry_run() {
     let payload = json!({"text": "test"});
 
     // This should not send a request
-    send_payload(&client, Some(&server.url("/")), &payload, true).await;
+    let _ = send_payload(&client, Some(&server.url("/")), &payload, true).await;
 
     // Assert that the mock was not called
     mock.assert_hits(0);
@@ -68,7 +74,7 @@ async fn test_send_buffered_lines() {
     let context = mock_context(&server, false);
     let mut buffer = vec!["line1".to_string(), "line2".to_string()];
 
-    send_buffered_lines(&context, &mut buffer).await;
+    let _ = send_buffered_lines(&context, &mut buffer).await;
 
     mock.assert();
     assert!(buffer.is_empty());

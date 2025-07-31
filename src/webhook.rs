@@ -1,5 +1,6 @@
 use crate::app::AppContext;
 use crate::cli::WebhookFormat;
+use crate::error::AppError;
 use crate::message::StreamMessage;
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -21,20 +22,19 @@ pub async fn send_payload(
     webhook_url: Option<&str>,
     payload: &Value,
     is_dry_run: bool,
-) {
+) -> Result<(), AppError> {
     if is_dry_run {
         println!("[DRY RUN] Would send to webhook: {}", payload);
-        return;
+        return Ok(());
     }
     if let Some(url) = webhook_url {
-        if let Err(e) = client.post(url).json(payload).send().await {
-            eprintln!("[shell_hook] Error sending to webhook: {}", e);
-        }
+        client.post(url).json(payload).send().await?;
     }
+    Ok(())
 }
 
 /// A convenience helper to create and send a simple text message.
-pub async fn send_message(context: &Arc<AppContext>, message: &str) {
+pub async fn send_message(context: &Arc<AppContext>, message: &str) -> Result<(), AppError> {
     let payload = create_payload(message, &context.args.format);
     send_payload(
         &context.client,
@@ -42,7 +42,7 @@ pub async fn send_message(context: &Arc<AppContext>, message: &str) {
         &payload,
         context.args.dry_run,
     )
-    .await;
+    .await
 }
 
 /// The core task that receives lines from a channel and sends them to the webhook in batches.
@@ -63,16 +63,25 @@ pub async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver
             Ok(Some(StreamMessage::Line(line))) => {
                 buffer.push(line);
                 if buffer.len() >= buffer_max_size {
-                    send_buffered_lines(&context, &mut buffer).await;
+                    if let Err(e) = send_buffered_lines(&context, &mut buffer).await {
+                        eprintln!("[shell_hook] Error sending buffered lines: {}", e);
+                    }
                 }
             }
             // Timeout elapsed, send what we have
             Err(_) => {
-                send_buffered_lines(&context, &mut buffer).await;
+                if let Err(e) = send_buffered_lines(&context, &mut buffer).await {
+                    eprintln!(
+                        "[shell_hook] Error sending buffered lines on timeout: {}",
+                        e
+                    );
+                }
             }
             // Command finished or channel closed, send remainder and exit
             Ok(Some(StreamMessage::CommandFinished)) | Ok(None) => {
-                send_buffered_lines(&context, &mut buffer).await;
+                if let Err(e) = send_buffered_lines(&context, &mut buffer).await {
+                    eprintln!("[shell_hook] Error sending final buffered lines: {}", e);
+                }
                 break;
             }
         }
@@ -80,9 +89,12 @@ pub async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver
 }
 
 /// Sends the current buffer of lines as a single webhook message.
-pub async fn send_buffered_lines(context: &Arc<AppContext>, buffer: &mut Vec<String>) {
+pub async fn send_buffered_lines(
+    context: &Arc<AppContext>,
+    buffer: &mut Vec<String>,
+) -> Result<(), AppError> {
     if buffer.is_empty() {
-        return;
+        return Ok(());
     }
     let combined_message = buffer.join("\n");
     let full_message = if let Some(title) = &context.args.title {
@@ -90,6 +102,7 @@ pub async fn send_buffered_lines(context: &Arc<AppContext>, buffer: &mut Vec<Str
     } else {
         combined_message
     };
-    send_message(context, &full_message).await;
+    send_message(context, &full_message).await?;
     buffer.clear();
+    Ok(())
 }
