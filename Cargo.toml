@@ -1,0 +1,13 @@
+[package]
+name = "hook-stream"
+version = "0.1.0"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] } # "full" enables all tokio features, including process spawning and I/O
+clap = { version = "4", features = ["derive", "env"] } # "derive" for easy struct-based parsing, "env" to read from environment
+reqwest = { version = "0.11", features = ["json"] } # "json" for easy JSON payload creation
+serde = { version = "1.0", features = ["derive"] } # For serializing our JSON payload
+serde_json = "1.0" # For creating JSON values
