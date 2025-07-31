@@ -1,4 +1,5 @@
 use crate::app::AppContext;
+use crate::cli::RunArgs;
 use crate::message::StreamMessage;
 use std::process::{ExitStatus, Stdio};
 use std::sync::Arc;
@@ -8,21 +9,22 @@ use tokio::sync::mpsc;
 
 /// Spawns the command, captures its stdout/stderr, and sends lines to the channel.
 pub async fn run_command_and_stream(
-    context: Arc<AppContext>,
+    _context: Arc<AppContext>,
     tx: mpsc::Sender<StreamMessage>,
+    run_args: &RunArgs,
 ) -> std::io::Result<ExitStatus> {
-    let mut child = Command::new(&context.args.command[0])
-        .args(&context.args.command[1..])
+    let mut child = Command::new(&run_args.command[0])
+        .args(&run_args.command[1..])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
 
     let mut tasks = Vec::new();
     if let Some(stdout) = child.stdout.take() {
-        tasks.push(stream_output(stdout, tx.clone(), context.args.quiet, false));
+        tasks.push(stream_output(stdout, tx.clone(), run_args.quiet, false));
     }
     if let Some(stderr) = child.stderr.take() {
-        tasks.push(stream_output(stderr, tx.clone(), context.args.quiet, true));
+        tasks.push(stream_output(stderr, tx.clone(), run_args.quiet, true));
     }
 
     // Wait for the command to complete and for readers to finish

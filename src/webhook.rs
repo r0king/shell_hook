@@ -35,27 +35,27 @@ pub async fn send_payload(
 
 /// A convenience helper to create and send a simple text message.
 pub async fn send_message(context: &Arc<AppContext>, message: &str) -> Result<(), AppError> {
-    let payload = create_payload(message, &context.args.format);
+    let payload = create_payload(message, &context.cli.format);
     send_payload(
         &context.client,
-        context.args.webhook_url.as_deref(),
+        context.cli.webhook_url.as_deref(),
         &payload,
-        context.args.dry_run,
+        context.cli.dry_run,
     )
     .await
 }
 
 /// The core task that receives lines from a channel and sends them to the webhook in batches.
 pub async fn run_webhook_sender(context: Arc<AppContext>, mut rx: mpsc::Receiver<StreamMessage>) {
-    if context.args.webhook_url.is_none() && !context.args.dry_run {
+    if context.cli.webhook_url.is_none() && !context.cli.dry_run {
         // Still need to drain the receiver if no webhook is set, to prevent the sender from blocking.
         while (rx.recv().await).is_some() {}
         return;
     }
 
     let mut buffer = Vec::new();
-    let buffer_timeout = Duration::from_secs_f64(context.args.buffer_timeout);
-    let buffer_max_size = context.args.buffer_size;
+    let buffer_timeout = Duration::from_secs_f64(context.cli.buffer_timeout);
+    let buffer_max_size = context.cli.buffer_size;
 
     loop {
         match tokio::time::timeout(buffer_timeout, rx.recv()).await {
@@ -97,7 +97,7 @@ pub async fn send_buffered_lines(
         return Ok(());
     }
     let combined_message = buffer.join("\n");
-    let full_message = if let Some(title) = &context.args.title {
+    let full_message = if let Some(title) = &context.cli.title {
         format!("[{}] {}", title, combined_message)
     } else {
         combined_message

@@ -1,19 +1,54 @@
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 
 /// A powerful CLI tool to stream command output to webhooks with buffering,
 /// custom messages, and multi-platform support.
 #[derive(Parser, Debug)]
 #[command(
-    author, // Reads from Cargo.toml
-    version, // Reads from Cargo.toml
-    about, // Reads from Cargo.toml's description
+    author,
+    version,
+    about,
     long_about = None
 )]
-pub struct Args {
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Command,
+
     /// The webhook URL to send messages to. Can also be set via the WEBHOOK_URL environment variable.
-    #[arg(long, env = "WEBHOOK_URL", value_name = "URL")]
+    #[arg(long, global = true, env = "WEBHOOK_URL", value_name = "URL")]
     pub webhook_url: Option<String>,
 
+    /// A title to prepend to all messages, e.g., "[My Project]".
+    #[arg(short, long, global = true, value_name = "TITLE")]
+    pub title: Option<String>,
+
+    /// The format of the webhook payload.
+    #[arg(long, global = true, value_enum, default_value_t=WebhookFormat::GoogleChat)]
+    pub format: WebhookFormat,
+
+    /// Max number of lines to buffer before sending a webhook message.
+    #[arg(long, global = true, default_value_t = 10, value_name = "COUNT")]
+    pub buffer_size: usize,
+
+    /// Max time in seconds to wait before flushing the buffer.
+    #[arg(long, global = true, default_value_t = 2.0, value_name = "SECONDS")]
+    pub buffer_timeout: f64,
+
+    /// Don't execute the command or send webhooks; just print what would be done.
+    #[arg(long, global = true)]
+    pub dry_run: bool,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Command {
+    /// Run a single command and stream its output.
+    Run(RunArgs),
+    /// Start an interactive shell session.
+    Shell,
+}
+
+/// Arguments for running a single command.
+#[derive(Parser, Debug, Clone)]
+pub struct RunArgs {
     /// Custom message to send on command success.
     #[arg(long, value_name = "MESSAGE")]
     pub on_success: Option<String>,
@@ -25,26 +60,6 @@ pub struct Args {
     /// Suppress streaming of stdout/stderr to the webhook (start/finish messages are still sent).
     #[arg(short, long)]
     pub quiet: bool,
-
-    /// A title to prepend to all messages, e.g., "[My Project]".
-    #[arg(short, long, value_name = "TITLE")]
-    pub title: Option<String>,
-
-    /// Don't execute the command or send webhooks; just print what would be done.
-    #[arg(long)]
-    pub dry_run: bool,
-
-    /// The format of the webhook payload.
-    #[arg(long, value_enum, default_value_t=WebhookFormat::GoogleChat)]
-    pub format: WebhookFormat,
-
-    /// Max number of lines to buffer before sending a webhook message.
-    #[arg(long, default_value_t = 10, value_name = "COUNT")]
-    pub buffer_size: usize,
-
-    /// Max time in seconds to wait before flushing the buffer.
-    #[arg(long, default_value_t = 2.0, value_name = "SECONDS")]
-    pub buffer_timeout: f64,
 
     /// The command to execute and stream its output.
     #[arg(required = true, last = true, value_name = "COMMAND")]

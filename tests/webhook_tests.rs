@@ -3,7 +3,7 @@ use httpmock::MockServer;
 use reqwest::Client;
 use serde_json::json;
 use shell_hook::app::AppContext;
-use shell_hook::cli::{Args, WebhookFormat};
+use shell_hook::cli::{Cli, Command, RunArgs, WebhookFormat};
 use shell_hook::message::StreamMessage;
 use shell_hook::webhook::{create_payload, run_webhook_sender, send_buffered_lines, send_payload};
 use std::sync::Arc;
@@ -12,13 +12,17 @@ use tokio::sync::mpsc;
 
 /// Creates a default AppContext for testing.
 fn mock_context(server: &MockServer, dry_run: bool) -> Arc<AppContext> {
-    let args = Args {
-        webhook_url: Some(server.url("/")),
-        dry_run,
+    let run_args = RunArgs {
         command: vec!["echo".to_string(), "test".to_string()],
         on_success: None,
         on_failure: None,
         quiet: false,
+    };
+
+    let cli = Cli {
+        webhook_url: Some(server.url("/")),
+        dry_run,
+        command: Command::Run(run_args),
         title: None,
         format: WebhookFormat::GoogleChat,
         buffer_size: 10,
@@ -26,7 +30,7 @@ fn mock_context(server: &MockServer, dry_run: bool) -> Arc<AppContext> {
     };
 
     Arc::new(AppContext {
-        args: Arc::new(args),
+        cli: Arc::new(cli),
         client: Client::new(),
     })
 }
@@ -97,7 +101,7 @@ async fn test_run_webhook_sender_sends_on_timeout() {
 
     // Run the sender, but timeout before it can complete
     let _ = tokio::time::timeout(
-        Duration::from_secs_f64(context.args.buffer_timeout + 1.0),
+        Duration::from_secs_f64(context.cli.buffer_timeout + 1.0),
         run_webhook_sender(context, rx),
     )
     .await;
@@ -116,7 +120,7 @@ async fn test_run_webhook_sender_sends_on_buffer_full() {
 
     let context = mock_context(&server, false);
     let (tx, rx) = mpsc::channel(100);
-    for i in 0..context.args.buffer_size {
+    for i in 0..context.cli.buffer_size {
         tx.send(StreamMessage::Line(format!("line {}", i)))
             .await
             .unwrap();

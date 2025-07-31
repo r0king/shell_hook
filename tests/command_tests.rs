@@ -1,28 +1,26 @@
 use reqwest::Client;
 use shell_hook::app::AppContext;
-use shell_hook::cli::{Args, WebhookFormat};
+use shell_hook::cli::{Cli, Command, RunArgs, WebhookFormat};
 use shell_hook::command::run_command_and_stream;
 use shell_hook::message::StreamMessage;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-fn create_test_context(command: Vec<&str>, quiet: bool) -> Arc<AppContext> {
-    let args = Args {
-        command: command.into_iter().map(String::from).collect(),
-        quiet,
+fn create_test_context(run_args: RunArgs) -> (Arc<AppContext>, RunArgs) {
+    let cli = Cli {
+        command: Command::Run(run_args.clone()),
         webhook_url: None,
-        on_success: None,
-        on_failure: None,
         title: None,
         dry_run: false,
         format: WebhookFormat::GoogleChat,
         buffer_size: 10,
         buffer_timeout: 2.0,
     };
-    Arc::new(AppContext {
-        args: Arc::new(args),
+    let context = Arc::new(AppContext {
+        cli: Arc::new(cli),
         client: Client::new(),
-    })
+    });
+    (context, run_args)
 }
 
 async fn collect_messages(mut rx: mpsc::Receiver<StreamMessage>) -> Vec<StreamMessage> {
@@ -38,10 +36,16 @@ async fn collect_messages(mut rx: mpsc::Receiver<StreamMessage>) -> Vec<StreamMe
 
 #[tokio::test]
 async fn test_run_command_success() {
-    let context = create_test_context(vec!["echo", "hello world"], false);
+    let run_args = RunArgs {
+        command: vec!["echo".to_string(), "hello world".to_string()],
+        quiet: false,
+        on_success: None,
+        on_failure: None,
+    };
+    let (context, run_args) = create_test_context(run_args);
     let (tx, rx) = mpsc::channel(10);
 
-    let status_result = run_command_and_stream(context, tx).await;
+    let status_result = run_command_and_stream(context, tx, &run_args).await;
     assert!(status_result.is_ok());
     let status = status_result.unwrap();
     assert!(status.success());
@@ -57,9 +61,15 @@ async fn test_run_command_success() {
 
 #[tokio::test]
 async fn test_run_command_with_stderr() {
-    let context = create_test_context(vec!["sh", "-c", "echo 'error message' >&2"], false);
+    let run_args = RunArgs {
+        command: vec!["sh".to_string(), "-c".to_string(), "echo 'error message' >&2".to_string()],
+        quiet: false,
+        on_success: None,
+        on_failure: None,
+    };
+    let (context, run_args) = create_test_context(run_args);
     let (tx, rx) = mpsc::channel(10);
-    let status_result = run_command_and_stream(context, tx).await;
+    let status_result = run_command_and_stream(context, tx, &run_args).await;
     assert!(status_result.is_ok());
     let status = status_result.unwrap();
     assert!(status.success());
@@ -74,10 +84,16 @@ async fn test_run_command_with_stderr() {
 
 #[tokio::test]
 async fn test_run_command_failure() {
-    let context = create_test_context(vec!["sh", "-c", "exit 1"], false);
+    let run_args = RunArgs {
+        command: vec!["sh".to_string(), "-c".to_string(), "exit 1".to_string()],
+        quiet: false,
+        on_success: None,
+        on_failure: None,
+    };
+    let (context, run_args) = create_test_context(run_args);
     let (tx, rx) = mpsc::channel(10);
 
-    let status_result = run_command_and_stream(context, tx).await;
+    let status_result = run_command_and_stream(context, tx, &run_args).await;
     assert!(status_result.is_ok());
     let status = status_result.unwrap();
     assert_eq!(status.code(), Some(1));
@@ -88,10 +104,16 @@ async fn test_run_command_failure() {
 
 #[tokio::test]
 async fn test_run_command_quiet_mode() {
-    let context = create_test_context(vec!["echo", "hello world"], true);
+    let run_args = RunArgs {
+        command: vec!["echo".to_string(), "hello world".to_string()],
+        quiet: true,
+        on_success: None,
+        on_failure: None,
+    };
+    let (context, run_args) = create_test_context(run_args);
     let (tx, rx) = mpsc::channel(10);
 
-    let status_result = run_command_and_stream(context, tx).await;
+    let status_result = run_command_and_stream(context, tx, &run_args).await;
     assert!(status_result.is_ok());
 
     let messages = collect_messages(rx).await;

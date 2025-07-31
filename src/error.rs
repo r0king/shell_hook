@@ -1,4 +1,5 @@
 use crate::message::StreamMessage;
+use rustyline::error::ReadlineError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
@@ -16,4 +17,7 @@ pub enum AppError {
 
     #[error("Webhook request failed: {0}")]
     WebhookError(#[from] reqwest::Error),
+
+    #[error("Readline error: {0}")]
+    ReadlineError(#[from] ReadlineError),
 }
