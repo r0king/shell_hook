@@ -1,7 +1,5 @@
 # ShellHook: Stream Command Output to Webhooks
 
-[![CI](https://github.com/r0king/shell_hook/actions/workflows/ci.yml/badge.svg)](https://github.com/r0king/shell_hook/actions/workflows/ci.yml)
-
 **ShellHook** is a powerful and flexible CLI tool that bridges the gap between your command-line scripts and modern notification platforms. It captures the `stdout` and `stderr` of any command, buffers the output, and streams it to a webhook in real-time.
 
 It's perfect for monitoring long-running processes, getting build notifications, or receiving alerts from cron jobs.
@@ -9,8 +7,6 @@ It's perfect for monitoring long-running processes, getting build notifications,
 ## Key Features
 
 - **Real-time Output Streaming**: Get instant feedback from your scripts by streaming `stdout` and `stderr` directly to your preferred webhook.
-  
-  ![Demo](https://github.com/r0king/shell_hook/assets/18419334/531d0411-92ba-4475-b072-a08b5f259695)
 
 - **Interactive Shell Mode**: Launch a persistent session for running multiple commands without exiting. All commands are executed in a shell, so you can use pipes and other shell features.
 - **Smart Buffering**: Avoid rate-limiting issues with intelligent line buffering. Output is sent in batches based on size or time, ensuring you never miss a line.
